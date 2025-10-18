@@ -41,8 +41,7 @@ class CustomLoginView(LoginView):
   template_name = "auth/login.html"
 
   def get_success_url(self):
-    messages.success(self.request, f"Bienvenido {self.request.user.full_name} 👋")
-    return reverse_lazy("core:home")
+    return reverse_lazy("auth_api:core:home")
 
 
 class CustomLogoutView(LogoutView):

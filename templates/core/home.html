@@ -1,4 +1,5 @@
 {% extends './components/base.html' %}
+{% load static %}
 
 {% block content %}
   <style>
@@ -6,6 +7,38 @@
           text-align: center;
           font-size: 24px;
           margin-bottom: 30px;
+      }
+
+      .messages {
+          max-width: 600px;
+          margin: 0 auto 20px auto;
+          text-align: center;
+      }
+
+      .alert {
+          padding: 12px 20px;
+          border-radius: 8px;
+          margin-bottom: 10px;
+          font-weight: bold;
+          transition: opacity 0.5s ease;
+      }
+
+      .alert-success {
+          background-color: #c6f6d5;
+          color: #22543d;
+          border-left: 4px solid #38a169;
+      }
+
+      .alert-error {
+          background-color: #fed7d7;
+          color: #742a2a;
+          border-left: 4px solid #e53e3e;
+      }
+
+      .alert-info {
+          background-color: #bee3f8;
+          color: #2c5282;
+          border-left: 4px solid #3182ce;
       }
 
       .cards {
@@ -65,37 +98,52 @@
           }
       }
   </style>
-
-  <h1>HOLA {{ user_name }}, BIENVENIDO AL ASISTENTE DE NAVEGACION 👋 ◯(i)</h1>
-
+  {% if messages %}
+    <div class="messages" id="messages-container">
+      {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+          {{ message }}
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+  <h1>HOLA {{ user_name }}, BIENVENIDO AL ASISTENTE DE NAVEGACIÓN 👋 ◯(i)</h1>
   <div class="cards">
     <a href="/navegacion/" class="card">
-      <img src="placeholder-mic.png" alt="Icono micrófono">
+      <img src="{% static 'images/placeholder-mic.png' %}" alt="Icono micrófono">
       <p>Navegación ◯(i)</p>
     </a>
     <a href="/deteccion-obstaculos/" class="card">
-      <img src="placeholder-cane.png" alt="Icono detección">
+      <img src="{% static 'images/placeholder-cane.png' %}" alt="Icono detección">
       <p>Detección de obstáculos ◯(i)</p>
     </a>
     <a href="/modo-entrenamiento/" class="card">
-      <img src="placeholder-headphones.png" alt="Icono entrenamiento">
+      <img src="{% static 'images/placeholder-headphones.png' %}" alt="Icono entrenamiento">
       <p>Modo de entrenamiento ◯(i)</p>
     </a>
     <a href="/emergencia/" class="card card-sos">
-      <img src="placeholder-sos.png" alt="Icono SOS">
+      <img src="{% static 'images/placeholder-sos.png' %}" alt="Icono SOS">
       <p>Botón de emergencia ◯(i)<br>SOS</p>
     </a>
     <a href="/lectura-textos/" class="card">
-      <img src="placeholder-book.png" alt="Icono lectura">
+      <img src="{% static 'images/placeholder-book.png' %}" alt="Icono lectura">
       <p>Lectura de textos ◯(i)</p>
     </a>
     <a href="/retroalimentacion/" class="card">
-      <img src="placeholder-headset.png" alt="Icono retroalimentación">
+      <img src="{% static 'images/placeholder-headset.png' %}" alt="Icono retroalimentación">
       <p>Retroalimentación del usuario ◯(i)</p>
     </a>
   </div>
 
   <script>
-    console.log('Dashboard cargado');
+    console.log('Dashboard cargado correctamente');
+
+    setTimeout(() => {
+      const messages = document.getElementById('messages-container');
+      if (messages) {
+        messages.style.opacity = "0";
+        setTimeout(() => messages.remove(), 500);
+      }
+    }, 5000);
   </script>
 {% endblock %}
