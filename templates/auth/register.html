@@ -1,0 +1,589 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Registro de Usuario - PathFinder AI</title>
+  <style>
+      * {
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+      }
+
+      body {
+          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+          background: linear-gradient(180deg, #3d2587 0%, #2d1b69 50%, #1a0e3e 100%);
+          min-height: 100vh;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 40px 20px;
+      }
+
+      .container {
+          max-width: 1200px;
+          width: 100%;
+      }
+
+      .header {
+          display: flex;
+          align-items: center;
+          gap: 15px;
+          margin-bottom: 15px;
+      }
+
+      .header h1 {
+          color: white;
+          font-size: 2.5rem;
+          font-weight: 700;
+          letter-spacing: 1px;
+      }
+
+      .header .icon {
+          font-size: 2.5rem;
+      }
+
+      .subtitle {
+          color: rgba(255, 255, 255, 0.8);
+          margin-bottom: 40px;
+          font-size: 1.1rem;
+      }
+
+      .messages {
+          margin-bottom: 20px;
+      }
+
+      .alert {
+          padding: 12px 20px;
+          border-radius: 8px;
+          margin-bottom: 10px;
+      }
+
+      .alert-success {
+          background-color: #c6f6d5;
+          color: #22543d;
+          border-left: 4px solid #38a169;
+      }
+
+      .alert-error {
+          background-color: #fed7d7;
+          color: #742a2a;
+          border-left: 4px solid #e53e3e;
+      }
+
+      .form-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 30px 40px;
+          margin-bottom: 40px;
+      }
+
+      .form-group {
+          display: flex;
+          flex-direction: column;
+      }
+
+      .form-group label {
+          color: white;
+          font-weight: 600;
+          margin-bottom: 12px;
+          font-size: 1.05rem;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+      }
+
+      .accessibility-icons {
+          display: flex;
+          gap: 8px;
+          font-size: 1.1rem;
+      }
+
+      .input-wrapper {
+          position: relative;
+          display: flex;
+          align-items: center;
+      }
+
+      .form-group input {
+          width: 100%;
+          padding: 16px 55px 16px 18px;
+          border: none;
+          border-radius: 8px;
+          font-size: 1rem;
+          background: rgba(255, 255, 255, 0.15);
+          backdrop-filter: blur(10px);
+          color: white;
+          transition: all 0.3s ease;
+      }
+
+      .form-group input::placeholder {
+          color: rgba(255, 255, 255, 0.4);
+      }
+
+      .form-group input:focus {
+          outline: none;
+          background: rgba(255, 255, 255, 0.2);
+          box-shadow: 0 0 0 2px rgba(155, 215, 68, 0.4);
+      }
+
+      .form-group input.valid {
+          background: rgba(72, 187, 120, 0.15);
+      }
+
+      .form-group input.invalid {
+          background: rgba(245, 101, 101, 0.15);
+      }
+
+      .input-icons {
+          position: absolute;
+          right: 12px;
+          display: flex;
+          gap: 8px;
+          align-items: center;
+      }
+
+      .icon-btn {
+          background: none;
+          border: none;
+          cursor: pointer;
+          font-size: 1.3rem;
+          opacity: 0.7;
+          transition: opacity 0.3s;
+          padding: 4px;
+      }
+
+      .icon-btn:hover {
+          opacity: 1;
+      }
+
+      .validation-icon {
+          width: 26px;
+          height: 26px;
+          border-radius: 50%;
+          background: #48bb78;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: white;
+          font-weight: bold;
+          font-size: 0.9rem;
+      }
+
+      .invalid-icon {
+          background: #f56565;
+      }
+
+      .error-message {
+          color: #fed7d7;
+          font-size: 0.875rem;
+          margin-top: 8px;
+      }
+
+      /* Card del Asistente */
+      .assistant-card {
+          grid-column: span 2;
+          background: linear-gradient(135deg, #e8e8e8 0%, #d5d5d5 100%);
+          border-radius: 20px;
+          padding: 30px 40px;
+          display: flex;
+          align-items: center;
+          gap: 30px;
+          box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+          margin-top: 20px;
+      }
+
+      .assistant-illustration {
+          flex-shrink: 0;
+          width: 200px;
+          height: 180px;
+          position: relative;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+      }
+
+      .assistant-illustration-placeholder {
+          width: 100%;
+          height: 100%;
+          background: rgba(0, 0, 0, 0.1);
+          border-radius: 15px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-direction: column;
+          gap: 10px;
+          font-size: 0.9rem;
+          color: #666;
+          text-align: center;
+          padding: 20px;
+      }
+
+      .assistant-illustration img {
+          width: 100%;
+          height: 100%;
+          object-fit: contain;
+      }
+
+      .nav-icons {
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          display: flex;
+          gap: 80px;
+          align-items: center;
+      }
+
+      .nav-icon {
+          width: 40px;
+          height: 40px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 1.5rem;
+          z-index: 2;
+      }
+
+      .nav-icon.red {
+          background-color: #e53e3e;
+      }
+
+      .nav-icon.green {
+          background-color: #48bb78;
+      }
+
+      .path-line {
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          width: 120px;
+          height: 2px;
+          background: repeating-linear-gradient(
+                  to right,
+                  #718096 0px,
+                  #718096 8px,
+                  transparent 8px,
+                  transparent 16px
+          );
+          z-index: 1;
+      }
+
+      .assistant-content {
+          flex: 1;
+      }
+
+      .assistant-content h3 {
+          color: #2d3748;
+          font-size: 2.5rem;
+          font-weight: 700;
+          margin-bottom: 10px;
+          letter-spacing: 1px;
+      }
+
+      .assistant-content p {
+          color: #4a5568;
+          font-size: 1.1rem;
+          line-height: 1.5;
+          font-weight: 500;
+      }
+
+      .submit-section {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 20px;
+          margin-top: 40px;
+      }
+
+      .btn-submit {
+          background: linear-gradient(135deg, #9bd744 0%, #7cb342 100%);
+          color: white;
+          border: none;
+          padding: 18px 70px;
+          font-size: 1.15rem;
+          font-weight: 600;
+          border-radius: 50px;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          box-shadow: 0 4px 15px rgba(155, 215, 68, 0.4);
+          display: flex;
+          align-items: center;
+          gap: 12px;
+      }
+
+      .btn-submit:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 6px 20px rgba(155, 215, 68, 0.6);
+      }
+
+      .btn-submit .icon {
+          font-size: 1.3rem;
+      }
+
+      .login-link {
+          color: rgba(255, 255, 255, 0.9);
+          font-size: 1rem;
+      }
+
+      .login-link a {
+          color: white;
+          text-decoration: none;
+          font-weight: 700;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+      }
+
+      .login-link a:hover {
+          text-decoration: underline;
+      }
+
+      @media (max-width: 968px) {
+          .form-grid {
+              grid-template-columns: 1fr;
+              gap: 25px;
+          }
+
+          .assistant-card {
+              grid-column: span 1;
+              flex-direction: column;
+              text-align: center;
+              padding: 25px;
+          }
+
+          .assistant-illustration {
+              width: 160px;
+              height: 140px;
+          }
+
+          .header h1 {
+              font-size: 2rem;
+          }
+
+          .assistant-content h3 {
+              font-size: 2rem;
+          }
+
+          body {
+              padding: 30px 15px;
+          }
+      }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>REGISTRO DE USUARIO</h1>
+    <span class="icon">👤</span>
+  </div>
+  <p class="subtitle">Completa tus datos para empezar a usar el asistente</p>
+
+  {% if messages %}
+    <div class="messages">
+      {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+          {{ message }}
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <form method="post" id="registerForm">
+    {% csrf_token %}
+
+    <div class="form-grid">
+      <!-- Nombre completo -->
+      <div class="form-group">
+        <label for="{{ form.full_name.id_for_label }}">
+          Nombre completo
+        </label>
+        <div class="input-wrapper">
+          {{ form.full_name }}
+          <div class="input-icons">
+            <button type="button" class="icon-btn" title="Entrada por voz">🎤</button>
+            <span class="validation-icon" data-field="full_name" style="display: none;">✓</span>
+          </div>
+        </div>
+        {% if form.full_name.errors %}
+          <span class="error-message">{{ form.full_name.errors.0 }}</span>
+        {% endif %}
+      </div>
+
+      <!-- Correo Electrónico -->
+      <div class="form-group">
+        <label for="{{ form.email.id_for_label }}">
+          Correo Electrónico/Usuario
+        </label>
+        <div class="input-wrapper">
+          {{ form.email }}
+          <div class="input-icons">
+            <button type="button" class="icon-btn" title="Entrada por voz">🎤</button>
+            <span class="validation-icon" data-field="email" style="display: none;">✓</span>
+          </div>
+        </div>
+        {% if form.email.errors %}
+          <span class="error-message">{{ form.email.errors.0 }}</span>
+        {% endif %}
+      </div>
+
+      <!-- Contraseña -->
+      <div class="form-group">
+        <label for="{{ form.password1.id_for_label }}">
+          Contraseña
+        </label>
+        <div class="input-wrapper">
+          {{ form.password1 }}
+          <div class="input-icons">
+            <span class="validation-icon" data-field="password1" style="display: none;">✓</span>
+          </div>
+        </div>
+        {% if form.password1.errors %}
+          <span class="error-message">{{ form.password1.errors.0 }}</span>
+        {% endif %}
+      </div>
+
+      <!-- Confirmar Contraseña -->
+      <div class="form-group">
+        <label for="{{ form.password2.id_for_label }}">
+          Confirmar contraseña
+        </label>
+        <div class="input-wrapper">
+          {{ form.password2 }}
+          <div class="input-icons">
+            <button type="button" class="icon-btn" title="Entrada por voz">🎤</button>
+            <span class="validation-icon" data-field="password2" style="display: none;">✓</span>
+          </div>
+        </div>
+        {% if form.password2.errors %}
+          <span class="error-message">{{ form.password2.errors.0 }}</span>
+        {% endif %}
+      </div>
+
+      <!-- Contacto de emergencia -->
+      <div class="form-group">
+        <label for="{{ form.emergency_contact.id_for_label }}">
+          Contacto de emergencia
+        </label>
+        <div class="input-wrapper">
+          {{ form.emergency_contact }}
+          <div class="input-icons">
+            <button type="button" class="icon-btn" title="Entrada por voz">🎤</button>
+            <span class="validation-icon" data-field="emergency_contact" style="display: none;">✓</span>
+          </div>
+        </div>
+        {% if form.emergency_contact.errors %}
+          <span class="error-message">{{ form.emergency_contact.errors.0 }}</span>
+        {% endif %}
+      </div>
+
+      <!-- Edad -->
+      <div class="form-group">
+        <label for="{{ form.age.id_for_label }}">
+          Edad
+        </label>
+        <div class="input-wrapper">
+          {{ form.age }}
+          <div class="input-icons">
+            <button type="button" class="icon-btn" title="Entrada por voz">🎤</button>
+            <span class="validation-icon" data-field="age" style="display: none;">✓</span>
+          </div>
+        </div>
+        {% if form.age.errors %}
+          <span class="error-message">{{ form.age.errors.0 }}</span>
+        {% endif %}
+      </div>
+
+      <!-- Contacto alternativo -->
+      <div class="form-group">
+        <label for="{{ form.alternative_contact.id_for_label }}">
+          Contacto alternativo
+        </label>
+        <div class="input-wrapper">
+          {{ form.alternative_contact }}
+          <div class="input-icons">
+            <button type="button" class="icon-btn" title="Entrada por voz">🎤</button>
+            <span class="validation-icon" data-field="alternative_contact" style="display: none;">✓</span>
+          </div>
+        </div>
+        {% if form.alternative_contact.errors %}
+          <span class="error-message">{{ form.alternative_contact.errors.0 }}</span>
+        {% endif %}
+      </div>
+
+      <!-- Card del Asistente -->
+      <div class="assistant-card">
+        <div class="assistant-content">
+          <h3>ASISTENTE</h3>
+          <p>DE NAVEGACION<br>PARA PERSONAS CON<br>DISCAPACIDAD</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="submit-section">
+      <button type="submit" class="btn-submit">
+        Crear cuenta
+      </button>
+      <p class="login-link">
+        Ya tienes cuenta? <a href="{% url 'auth_api:login' %}">Inicia Sesión </a>
+      </p>
+    </div>
+  </form>
+</div>
+
+<script>
+  // Validación en tiempo real via AJAX
+  const form = document.getElementById('registerForm');
+  const inputs = form.querySelectorAll('input[type="text"], input[type="email"], input[type="number"], input[type="password"]');
+
+  inputs.forEach(input => {
+    input.addEventListener('blur', function () {
+      validateField(this);
+    });
+  });
+
+  function validateField(field) {
+    const fieldName = field.name;
+    const validationIcon = document.querySelector(`[data-field="${fieldName}"]`);
+
+    if (!field.value) {
+      validationIcon.style.display = 'none';
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append(fieldName, field.value);
+    formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+
+    fetch(window.location.href, {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    })
+      .then(response => response.json())
+      .then(data => {
+        validationIcon.style.display = 'flex';
+        if (data[fieldName] === 'valid') {
+          field.classList.remove('invalid');
+          field.classList.add('valid');
+          validationIcon.innerHTML = '✓';
+          validationIcon.className = 'validation-icon';
+        } else {
+          field.classList.remove('valid');
+          field.classList.add('invalid');
+          validationIcon.innerHTML = '✗';
+          validationIcon.className = 'validation-icon invalid-icon';
+        }
+      })
+      .catch(error => console.error('Error:', error));
+  }
+</script>
+</body>
+</html>

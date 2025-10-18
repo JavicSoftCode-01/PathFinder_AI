@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Asistente de Navegación</title>
+  <style>
+      /* Estilos base reutilizables */
+      body {
+          margin: 0;
+          padding: 0;
+          font-family: Arial, sans-serif;
+          background-color: #6a1b9a;
+          color: white;
+          display: flex;
+          flex-direction: column;
+          min-height: 100vh;
+      }
+
+      header {
+          background-color: #757575;
+          padding: 10px 20px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+      }
+
+      .header-left {
+          display: flex;
+          align-items: center;
+      }
+
+      .header-left img {
+          width: 40px;
+          height: 40px;
+          margin-right: 10px;
+      }
+
+      .header-left span {
+          font-size: 16px;
+          font-weight: bold;
+      }
+
+      .header-right {
+          display: flex;
+          align-items: center;
+      }
+
+      .header-right img {
+          width: 20px;
+          height: 20px;
+          margin-right: 10px;
+      }
+
+      .header-username {
+          background-color: #cddc39;
+          color: black;
+          padding: 5px 10px;
+          border-radius: 20px;
+          font-weight: bold;
+      }
+
+      main.container {
+          flex: 1;
+          padding: 20px;
+          max-width: 1200px;
+          margin: 0 auto;
+          width: 100%;
+          box-sizing: border-box;
+      }
+
+      /* Responsividad */
+      @media (max-width: 768px) {
+          header {
+              flex-direction: column;
+              text-align: center;
+          }
+
+          .header-left, .header-right {
+              justify-content: center;
+              margin-bottom: 10px;
+          }
+
+          main.container {
+              padding: 10px;
+          }
+      }
+
+      @media (max-width: 480px) {
+          .header-left span {
+              font-size: 14px;
+          }
+
+          .header-username {
+              font-size: 14px;
+          }
+      }
+  </style>
+</head>
+<body>
+<header>
+  <div class="header-left">
+    <img src="logo.png" alt="Logo Asistente">
+    <span>ASISTENTE DE NAVEGACIÓN PARA PERSONAS CON DISCAPACIDAD</span>
+  </div>
+  <div class="header-right">
+    <span class="header-username">{{ user_name }}</span>
+  </div>
+
+  {% if user.is_authenticated %}
+    <form action="{% url 'auth_api:logout' %}" method="post" style="display:inline;">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-danger btn-sm">Cerrar sesión</button>
+    </form>
+  {% endif %}
+
+</header>
+<main class="container">
+  {% block content %} {% endblock %}
+</main>
+</body>
+</html>
