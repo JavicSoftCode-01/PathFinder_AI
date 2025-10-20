@@ -2,7 +2,12 @@ from datetime import datetime
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.urls import reverse_lazy
 from django.views.generic import TemplateView
+from django.views.generic.edit import FormView
+
+from .forms import UserFeedbackForm
+from .models import TrainingExercise
 
 
 class HomeView(LoginRequiredMixin, TemplateView):
@@ -35,4 +40,31 @@ class EmergencyView(LoginRequiredMixin, TemplateView):
     now = datetime.now()
     context['current_date'] = now.strftime('%d/%m/%Y')
     context['current_time'] = now.strftime('%H:%M')
+    return context
+
+
+class FeedbackView(LoginRequiredMixin, FormView):
+  template_name = 'core/feedback.html'
+  form_class = UserFeedbackForm
+  success_url = reverse_lazy('auth_api:core:home')
+
+  def form_valid(self, form):
+    feedback = form.save(commit=False)
+    feedback.user = self.request.user
+    feedback.save()
+    return super().form_valid(form)
+
+
+class TrainingModeView(LoginRequiredMixin, TemplateView):
+  template_name = 'core/training.html'
+
+  def get_context_data(self, **kwargs):
+    context = super().get_context_data(**kwargs)
+
+    exercises_queryset = TrainingExercise.objects.all().order_by('order')
+
+    exercises_list = list(exercises_queryset.values('command_text', 'explanation_text'))
+
+    context['exercises'] = exercises_list
+
     return context
