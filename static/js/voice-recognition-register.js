@@ -24,16 +24,19 @@ function validateField(field, speakFeedback = false) {
   const fieldName = field.name;
   const validationIcon = document.querySelector(`[data-field="${fieldName}"]`);
 
-  // Si el campo está vacío y no es alternative_contact, limpiar validación
-  if (!field.value && fieldName !== 'alternative_contact') {
-    validationIcon.style.display = 'none';
+  // Campos opcionales cliente-side: alternative_contact y emailAlternative
+  const optionalFields = ['alternative_contact', 'emailAlternative'];
+
+  // Si el campo está vacío y no es opcional, limpiar validación
+  if (!field.value && !optionalFields.includes(fieldName)) {
+    if (validationIcon) validationIcon.style.display = 'none';
     field.classList.remove('valid', 'invalid');
     return;
   }
 
-  // Si es alternative_contact vacío, es válido
-  if (fieldName === 'alternative_contact' && !field.value.trim()) {
-    validationIcon.style.display = 'none';
+  // Si es uno de los opcionales y está vacío -> válido (no mostrar icono)
+  if (optionalFields.includes(fieldName) && !field.value.trim()) {
+    if (validationIcon) validationIcon.style.display = 'none';
     field.classList.remove('valid', 'invalid');
     return;
   }
@@ -67,13 +70,15 @@ function validateField(field, speakFeedback = false) {
   })
     .then(response => response.json())
     .then(data => {
-      validationIcon.style.display = 'flex';
+      if (validationIcon) validationIcon.style.display = 'flex';
 
       if (data[fieldName] === 'valid') {
         field.classList.remove('invalid');
         field.classList.add('valid');
-        validationIcon.innerHTML = '✓';
-        validationIcon.className = 'validation-icon';
+        if (validationIcon) {
+          validationIcon.innerHTML = '✓';
+          validationIcon.className = 'validation-icon';
+        }
 
         if (speakFeedback) {
           speak(getFieldLabel(fieldName) + ' válido');
@@ -81,8 +86,10 @@ function validateField(field, speakFeedback = false) {
       } else {
         field.classList.remove('valid');
         field.classList.add('invalid');
-        validationIcon.innerHTML = '✗';
-        validationIcon.className = 'validation-icon invalid-icon';
+        if (validationIcon) {
+          validationIcon.innerHTML = '✗';
+          validationIcon.className = 'validation-icon invalid-icon';
+        }
 
         if (speakFeedback && data.error) {
           speak(data.error);
@@ -104,6 +111,8 @@ function getFieldLabel(fieldName) {
   const labels = {
     'full_name': 'Nombre completo',
     'email': 'Correo electrónico',
+    'emailEmergency': 'Correo electrónico de emergencia',
+    'emailAlternative': 'Correo electrónico alternativo',
     'password1': 'Contraseña',
     'password2': 'Confirmación de contraseña',
     'emergency_contact': 'Contacto de emergencia',
@@ -315,6 +324,8 @@ function getVoicePrompt(fieldName) {
   const prompts = {
     'full_name': 'Diga su nombre completo, ahora',
     'email': 'Diga su correo electrónico, ahora',
+    'emailEmergency': 'Diga su correo electrónico de emergencia, ahora',
+    'emailAlternative': 'Diga su correo electrónico alternativo, ahora',
     'password1': 'Diga su contraseña, ahora',
     'password2': 'Confirme su contraseña, ahora',
     'emergency_contact': 'Diga el número de contacto de emergencia, ahora',
@@ -328,6 +339,8 @@ function getVoicePrompt(fieldName) {
 function cleanTextByField(fieldName, text) {
   switch (fieldName) {
     case 'email':
+    case 'emailEmergency':
+    case 'emailAlternative':
       return cleanEmailText(text);
     case 'emergency_contact':
     case 'alternative_contact':

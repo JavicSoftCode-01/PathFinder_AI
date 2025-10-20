@@ -28,6 +28,8 @@ class EmergencyView(LoginRequiredMixin, TemplateView):
     context = super().get_context_data(**kwargs)
     user = self.request.user
     context['full_name'] = user.full_name
+    context['emailEmergency'] = user.emailEmergency
+    context['emailAlternative'] = user.emailAlternative
     context['emergency_contact'] = user.emergency_contact
     context['alternative_contact'] = user.alternative_contact if user.alternative_contact else ''
     now = datetime.now()

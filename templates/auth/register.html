@@ -46,7 +46,7 @@
         {% endif %}
       </div>
 
-      <!-- Correo Electrónico -->
+      <!-- Correo Electrónico (principal) -->
       <div class="form-group">
         <label for="{{ form.email.id_for_label }}">
           Correo Electrónico/Usuario
@@ -60,6 +60,40 @@
         </div>
         {% if form.email.errors %}
           <span class="error-message">{{ form.email.errors.0 }}</span>
+        {% endif %}
+      </div>
+
+      <!-- Correo Emergencia (REQUIRED) -->
+      <div class="form-group">
+        <label for="{{ form.emailEmergency.id_for_label }}">
+          Correo Electrónico de Emergencia
+        </label>
+        <div class="input-wrapper">
+          {{ form.emailEmergency }}
+          <div class="input-icons">
+            <button type="button" class="icon-btn" title="Entrada por voz">🎤</button>
+            <span class="validation-icon" data-field="emailEmergency" style="display: none;">✓</span>
+          </div>
+        </div>
+        {% if form.emailEmergency.errors %}
+          <span class="error-message">{{ form.emailEmergency.errors.0 }}</span>
+        {% endif %}
+      </div>
+
+      <!-- Correo Alternativo (OPCIONAL) -->
+      <div class="form-group">
+        <label for="{{ form.emailAlternative.id_for_label }}">
+          Correo Electrónico Alternativo <small>(opcional)</small>
+        </label>
+        <div class="input-wrapper">
+          {{ form.emailAlternative }}
+          <div class="input-icons">
+            <button type="button" class="icon-btn" title="Entrada por voz">🎤</button>
+            <span class="validation-icon" data-field="emailAlternative" style="display: none;">✓</span>
+          </div>
+        </div>
+        {% if form.emailAlternative.errors %}
+          <span class="error-message">{{ form.emailAlternative.errors.0 }}</span>
         {% endif %}
       </div>
 

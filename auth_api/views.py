@@ -57,10 +57,13 @@ class RegisterView(CreateView):
       print(f"Longitud: {len(field_value)}")
       print(f"{'=' * 50}\n")
 
-      if not field_value and field_name != 'alternative_contact':
+      # Campos opcionales que pueden venir vacíos
+      optional_fields = {'alternative_contact', 'emailAlternative'}
+
+      if not field_value and field_name not in optional_fields:
         return JsonResponse({field_name: "invalid", "error": "Este campo es requerido"})
 
-      if field_name == 'alternative_contact' and not field_value:
+      if field_name in optional_fields and not field_value:
         return JsonResponse({field_name: "valid"})
 
       try:
@@ -74,6 +77,14 @@ class RegisterView(CreateView):
           validated_email = Validation.validate_email(field_value)
           if CustomUser.objects.filter(email=validated_email).exists():
             return JsonResponse({field_name: "invalid", "error": "Este correo ya está registrado"})
+
+        elif field_name == 'emailEmergency':
+          print(f"Validando emailEmergency...")
+          Validation.validate_email(field_value)
+
+        elif field_name == 'emailAlternative':
+          print(f"Validando emailAlternative...")
+          Validation.validate_email(field_value)
 
         elif field_name == 'emergency_contact':
           print(f"Validando emergency_contact...")

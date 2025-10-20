@@ -16,6 +16,17 @@ class CustomUserCreationForm(UserCreationForm):
     label="Correo Electrónico/Usuario",
     widget=forms.EmailInput(attrs={'placeholder': 'Correo Electrónico/Usuario'}),
   )
+
+  emailEmergency = forms.EmailField(
+    label="Correo Electrónico de Emergencia",
+    widget=forms.EmailInput(attrs={'placeholder': 'Correo Electrónico de Emergencia'}),
+  )
+  emailAlternative = forms.EmailField(
+    label="Correo Electrónico Alternativo",
+    required=False,
+    widget=forms.EmailInput(attrs={'placeholder': 'Correo Electrónico Alternativo'}),
+  )
+
   emergency_contact = forms.CharField(
     max_length=10,
     label="Contacto de emergencia",
@@ -44,7 +55,11 @@ class CustomUserCreationForm(UserCreationForm):
 
   class Meta:
     model = CustomUser
-    fields = ('full_name', 'email', 'emergency_contact', 'age', 'alternative_contact', 'password1', 'password2')
+    fields = (
+      'full_name', 'email', 'emailEmergency', 'emailAlternative',
+      'emergency_contact', 'alternative_contact', 'age',
+      'password1', 'password2'
+    )
 
   def clean_full_name(self):
     value = self.cleaned_data.get('full_name')
@@ -62,6 +77,24 @@ class CustomUserCreationForm(UserCreationForm):
       return validated_email
     except ValidationError as e:
       raise ValidationError(str(e.message) if hasattr(e, 'message') else str(e))
+
+  def clean_emailEmergency(self):
+    value = self.cleaned_data.get('emailEmergency')
+    if value:
+      try:
+        return Validation.validate_email(value)
+      except ValidationError as e:
+        raise ValidationError(str(e.message) if hasattr(e, 'message') else str(e))
+    return value
+
+  def clean_emailAlternative(self):
+    value = self.cleaned_data.get('emailAlternative')
+    if value:
+      try:
+        return Validation.validate_email(value)
+      except ValidationError as e:
+        raise ValidationError(str(e.message) if hasattr(e, 'message') else str(e))
+    return value
 
   def clean_emergency_contact(self):
     value = self.cleaned_data.get('emergency_contact')
