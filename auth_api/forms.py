@@ -1,5 +1,6 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
+from django.core.exceptions import ValidationError
 
 from .models import CustomUser
 from .utils.validators import Validation
@@ -18,7 +19,12 @@ class CustomUserCreationForm(UserCreationForm):
   emergency_contact = forms.CharField(
     max_length=10,
     label="Contacto de emergencia",
-    widget=forms.NumberInput(attrs={'placeholder': 'Contacto de emergencia'}),
+    widget=forms.TextInput(attrs={
+      'placeholder': 'Contacto de emergencia',
+      'type': 'tel',
+      'inputmode': 'numeric',
+      'pattern': '[0-9]*'
+    }),
   )
   age = forms.IntegerField(
     label="Edad",
@@ -28,7 +34,12 @@ class CustomUserCreationForm(UserCreationForm):
     max_length=10,
     required=False,
     label="Contacto alternativo",
-    widget=forms.NumberInput(attrs={'placeholder': 'Contacto alternativo'}),
+    widget=forms.TextInput(attrs={
+      'placeholder': 'Contacto alternativo',
+      'type': 'tel',
+      'inputmode': 'numeric',
+      'pattern': '[0-9]*'
+    }),
   )
 
   class Meta:
@@ -37,22 +48,40 @@ class CustomUserCreationForm(UserCreationForm):
 
   def clean_full_name(self):
     value = self.cleaned_data.get('full_name')
-    return Validation.validate_full_name(value)
+    try:
+      return Validation.validate_full_name(value)
+    except ValidationError as e:
+      raise ValidationError(str(e.message))
 
   def clean_email(self):
     value = self.cleaned_data.get('email')
-    return Validation.validate_email(value)
+    try:
+      validated_email = Validation.validate_email(value)
+      if CustomUser.objects.filter(email=validated_email).exists():
+        raise ValidationError("Este correo electrónico ya está registrado")
+      return validated_email
+    except ValidationError as e:
+      raise ValidationError(str(e.message) if hasattr(e, 'message') else str(e))
 
   def clean_emergency_contact(self):
     value = self.cleaned_data.get('emergency_contact')
-    return Validation.validate_phone_number(value)
+    try:
+      return Validation.validate_phone_number(value)
+    except ValidationError as e:
+      raise ValidationError(str(e.message) if hasattr(e, 'message') else str(e))
 
   def clean_alternative_contact(self):
     value = self.cleaned_data.get('alternative_contact')
     if value:
-      return Validation.validate_phone_number(value)
+      try:
+        return Validation.validate_phone_number(value)
+      except ValidationError as e:
+        raise ValidationError(str(e.message) if hasattr(e, 'message') else str(e))
     return value
 
   def clean_age(self):
     value = self.cleaned_data.get('age')
-    return Validation.validate_age(value)
+    try:
+      return Validation.validate_age(value)
+    except ValidationError as e:
+      raise ValidationError(str(e.message) if hasattr(e, 'message') else str(e))

@@ -7,6 +7,8 @@
           text-align: center;
           font-size: 24px;
           margin-bottom: 30px;
+          color: #fff;
+          text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
       }
 
       .messages {
@@ -41,21 +43,40 @@
           border-left: 4px solid #3182ce;
       }
 
-      .cards {
+      .cards-container {
+          max-width: 1200px;
+          margin: 0 auto;
+          padding: 0 20px;
+      }
+
+      .cards-row {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
           gap: 20px;
       }
 
+      .top-row {
+          grid-template-columns: repeat(2, 1fr);
+          margin-bottom: 20px;
+      }
+
+      .bottom-row {
+          grid-template-columns: repeat(3, 1fr);
+      }
+
       .card {
-          background-color: white;
-          color: black;
+          background-color: #fff;
+          color: #000;
           padding: 20px;
-          border-radius: 10px;
+          border-radius: 20px;
           text-align: center;
           text-decoration: none;
           box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
           transition: transform 0.2s;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          min-height: 180px;
       }
 
       .card:hover {
@@ -63,39 +84,70 @@
       }
 
       .card img {
-          width: 60px;
-          height: 60px;
-          margin-bottom: 10px;
+          width: 80px;
+          height: auto;
+          margin-top: 10px;
       }
 
       .card p {
           font-weight: bold;
           margin: 0;
+          font-size: 16px;
       }
 
-      .card-sos {
-          color: red;
+      .card-sos p {
+          color: #e53e3e;
       }
 
-      @media (max-width: 768px) {
-          .cards {
-              grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      .card-sos p span {
+          font-size: 24px;
+      }
+
+      /* Responsividad para tablet */
+      @media (min-width: 768px) and (max-width: 991px) {
+          .top-row, .bottom-row {
+              grid-template-columns: repeat(2, 1fr);
           }
 
-          h1 {
-              font-size: 20px;
+          .bottom-row .card:last-child {
+              grid-column: span 2;
+              justify-self: center;
+              width: 50%;
           }
       }
 
-      @media (max-width: 480px) {
-          .cards {
-              grid-template-columns: 1fr;
+      /* Responsividad para móvil */
+      @media (max-width: 767px) {
+          .top-row, .bottom-row {
+              grid-template-columns: repeat(2, 1fr);
+          }
+
+          .bottom-row .card:last-child {
+              grid-column: span 2;
+              justify-self: center;
+              width: 50%;
+          }
+
+          .card {
+              min-height: 150px;
           }
 
           .card img {
-              width: 50px;
-              height: 50px;
+              width: 60px;
           }
+
+          .card p {
+              font-size: 14px;
+          }
+      }
+
+      /* Mejoras de accesibilidad */
+      .card {
+          font-size: 18px; /* Tamaño mayor para no videntes con asistentes de voz */
+      }
+
+      .card:focus {
+          outline: 3px solid #cddc39;
       }
   </style>
   {% if messages %}
@@ -107,43 +159,118 @@
       {% endfor %}
     </div>
   {% endif %}
-  <h1>HOLA {{ user_name }}, BIENVENIDO AL ASISTENTE DE NAVEGACIÓN 👋 ◯(i)</h1>
-  <div class="cards">
-    <a href="/navegacion/" class="card">
-      <img src="{% static 'images/placeholder-mic.png' %}" alt="Icono micrófono">
-      <p>Navegación ◯(i)</p>
-    </a>
-    <a href="/deteccion-obstaculos/" class="card">
-      <img src="{% static 'images/placeholder-cane.png' %}" alt="Icono detección">
-      <p>Detección de obstáculos ◯(i)</p>
-    </a>
-    <a href="/modo-entrenamiento/" class="card">
-      <img src="{% static 'images/placeholder-headphones.png' %}" alt="Icono entrenamiento">
-      <p>Modo de entrenamiento ◯(i)</p>
-    </a>
-    <a href="/emergencia/" class="card card-sos">
-      <img src="{% static 'images/placeholder-sos.png' %}" alt="Icono SOS">
-      <p>Botón de emergencia ◯(i)<br>SOS</p>
-    </a>
-    <a href="/lectura-textos/" class="card">
-      <img src="{% static 'images/placeholder-book.png' %}" alt="Icono lectura">
-      <p>Lectura de textos ◯(i)</p>
-    </a>
-    <a href="/retroalimentacion/" class="card">
-      <img src="{% static 'images/placeholder-headset.png' %}" alt="Icono retroalimentación">
-      <p>Retroalimentación del usuario ◯(i)</p>
-    </a>
+  <h1>HOLA {{ user_name }}, BIENVENIDO AL ASISTENTE DE NAVEGACIÓN 👋</h1>
+  <div class="cards-container">
+    <div class="cards-row top-row">
+      <a href="/deteccion-obstaculos/" class="card">
+        <p>Detección de obstáculos</p>
+        <img src="https://www.shutterstock.com/image-vector/blind-woman-holding-stick-mobile-600nw-1661441773.jpg"
+             alt="Icono detección">
+      </a>
+      <a href="/guia-usuario/" class="card">
+        <p>Guía de Usuario</p>
+        <img src="https://cdn-icons-png.flaticon.com/512/3135/3135768.png"
+             alt="Icono guía de usuario">
+      </a>
+    </div>
+    <div class="cards-row bottom-row">
+      <a href="{% url 'auth_api:core:emergency' %}" class="card card-sos">
+        <p>Botón de emergencia</p>
+        <img src="https://thumbs.dreamstime.com/b/red-phone-symbol-making-emergency-sos-call-red-phone-making-sos-emergency-call-symbol-332616758.jpg"
+             alt="Icono SOS">
+      </a>
+      <a href="/lectura-textos/" class="card">
+        <p>Lectura de textos</p>
+        <img src="https://static.vecteezy.com/system/resources/previews/046/851/430/non_2x/cartoon-blue-book-read-learning-vector.jpg"
+             alt="Icono lectura">
+      </a>
+      <a href="/retroalimentacion/" class="card">
+        <p>Retroalimentación del usuario</p>
+        <img src="https://media.istockphoto.com/id/1172142097/vector/operator-icon-vector-simple-and-flat-design-minimalist-style-black-color.jpg?s=612x612&w=0&k=20&c=A3-x56F4wLiDdMnQmSByHqgUz-elkp3CFZHiEvKfBSw="
+             alt="Icono retroalimentación">
+      </a>
+    </div>
   </div>
 
   <script>
     console.log('Dashboard cargado correctamente');
 
+    // ============================================
+    // FUNCIÓN DE SÍNTESIS DE VOZ
+    // ============================================
+    function speak(text, callback) {
+      if (!('speechSynthesis' in window)) {
+        console.error('Tu navegador no soporta síntesis de voz');
+        if (callback) callback();
+        return;
+      }
+
+      // Cancelar cualquier síntesis en curso
+      window.speechSynthesis.cancel();
+
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'es-ES';
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+      utterance.volume = 1.0;
+
+      utterance.onend = () => {
+        if (callback) callback();
+      };
+
+      utterance.onerror = (event) => {
+        console.error('Error en síntesis de voz:', event);
+        if (callback) callback();
+      };
+
+      window.speechSynthesis.speak(utterance);
+    }
+
+    // ============================================
+    // BIENVENIDA CON VOZ AL INGRESAR
+    // ============================================
+    window.addEventListener('load', function () {
+      setTimeout(() => {
+        // Buscar el mensaje de bienvenida
+        const messagesContainer = document.querySelector('.messages');
+
+        if (messagesContainer) {
+          const successAlert = messagesContainer.querySelector('.alert-success');
+
+          if (successAlert) {
+            const welcomeMessage = successAlert.textContent.trim();
+            console.log('Mensaje de bienvenida encontrado:', welcomeMessage);
+
+            // Hablar el mensaje de bienvenida
+            speak(welcomeMessage);
+          }
+        }
+
+        // También leer otros mensajes (errores, info)
+        if (messagesContainer) {
+          const otherAlerts = messagesContainer.querySelectorAll('.alert:not(.alert-success)');
+
+          otherAlerts.forEach((alert, index) => {
+            const messageText = alert.textContent.trim();
+
+            // Leer después del mensaje de bienvenida con un delay
+            setTimeout(() => {
+              speak(messageText);
+            }, (index + 1) * 2500);
+          });
+        }
+      }, 800); // Esperar 800ms después de que la página cargue completamente
+    });
+
+    // ============================================
+    // OCULTAR MENSAJES DESPUÉS DE 6 SEGUNDOS
+    // ============================================
     setTimeout(() => {
       const messages = document.getElementById('messages-container');
       if (messages) {
         messages.style.opacity = "0";
         setTimeout(() => messages.remove(), 500);
       }
-    }, 5000);
+    }, 6000);
   </script>
 {% endblock %}

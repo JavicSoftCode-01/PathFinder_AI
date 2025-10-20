@@ -24,7 +24,12 @@ SECRET_KEY = 'django-insecure-jro)-esmc@le)de8k*^q-hzg&-7ol%2_$0gmcme8%5zpdp=!3+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+# Configuración de hosts permitidos
+ALLOWED_HOSTS = [
+  'localhost',
+  '127.0.0.1',
+  '[::1]',  # IPv6 localhost
+]
 
 # Application definition
 
@@ -85,6 +90,10 @@ DATABASES = {
 AUTH_PASSWORD_VALIDATORS = [
   {
     'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+    'OPTIONS': {
+      'user_attributes': ('username', 'email', 'full_name'),
+      'max_similarity': 0.7,
+    }
   },
   {
     'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
@@ -109,7 +118,7 @@ LOGOUT_REDIRECT_URL = "auth_api:login"
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'es-es'
 
 TIME_ZONE = 'UTC'
 
@@ -132,3 +141,15 @@ MEDIA_ROOT = BASE_DIR / "media"
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Configuraciones de seguridad para desarrollo
+# En producción, estas deberían ser más restrictivas
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = 'SAMEORIGIN'
+
+# CSRF configuración (para permitir localhost)
+CSRF_TRUSTED_ORIGINS = [
+  'http://localhost:8369',
+  'http://127.0.0.1:8369',
+]

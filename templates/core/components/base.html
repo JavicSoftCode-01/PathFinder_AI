@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Asistente de Navegación</title>
+  {% load static %}
   <style>
-      /* Estilos base reutilizables */
       body {
           margin: 0;
           padding: 0;
@@ -18,75 +18,65 @@
       }
 
       header {
-          background-color: #757575;
-          padding: 10px 20px;
+          background-color: #a9a9a9;
+          padding: 15px 20px;
           display: flex;
           align-items: center;
           justify-content: space-between;
-          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-      }
-
-      .header-left {
-          display: flex;
-          align-items: center;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+          position: relative;
       }
 
       .header-left img {
-          width: 40px;
-          height: 40px;
-          margin-right: 10px;
-      }
-
-      .header-left span {
-          font-size: 16px;
-          font-weight: bold;
-      }
-
-      .header-right {
-          display: flex;
-          align-items: center;
-      }
-
-      .header-right img {
-          width: 20px;
-          height: 20px;
-          margin-right: 10px;
+          width: 250px;
+          height: 50px;
       }
 
       .header-username {
           background-color: #cddc39;
           color: black;
-          padding: 5px 10px;
-          border-radius: 20px;
+          padding: 10px 15px;
+          border-radius: 25px;
           font-weight: bold;
+          cursor: pointer;
+          font-size: 16px;
+          position: relative;
+          user-select: none;
       }
 
-      .messages {
-          margin-bottom: 20px;
+      /* Oculto por defecto */
+      .dropdown {
+          display: none;
+          position: absolute;
+          top: 100%;
+          right: 0;
+          background-color: #424242;
+          border-radius: 5px;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+          z-index: 1000;
+          min-width: 180px;
+          padding: 15px;
       }
 
-      .alert {
-          padding: 12px 20px;
-          border-radius: 8px;
-          margin-bottom: 10px;
+      /* Cuando está activo, se muestra */
+      .dropdown.active {
+          display: block;
       }
 
-      .alert-success {
-          background-color: #c6f6d5;
-          color: #22543d;
-          border-left: 4px solid #38a169;
+      .dropdown button {
+          width: 100%;
+          padding: 12px;
+          background-color: #e53e3e;
+          color: white;
+          border: none;
+          border-radius: 4px;
+          cursor: pointer;
+          font-size: 16px;
+          margin-top: 10px;
       }
 
-      .alert-error {
-          background-color: #fed7d7;
-          color: #742a2a;
-          border-left: 4px solid #e53e3e;
-      }
-
-      .alert-info {
-          background-color: #bee3f8;
-          color: #2c5282;
-          border-left: 4px solid #3182ce;
+      .dropdown button:hover {
+          background-color: #c53030;
       }
 
       main.container {
@@ -98,56 +88,98 @@
           box-sizing: border-box;
       }
 
-      /* Responsividad */
       @media (max-width: 768px) {
           header {
               flex-direction: column;
               text-align: center;
-          }
-
-          .header-left, .header-right {
-              justify-content: center;
-              margin-bottom: 10px;
-          }
-
-          main.container {
               padding: 10px;
+          }
+
+          .header-left img {
+              display: none;
+          }
+
+          .header-username {
+              font-size: 18px;
+              padding: 12px 20px;
+          }
+
+          .dropdown {
+              right: 50%;
+              transform: translateX(50%);
+              width: 80%;
+              margin-top: 10px;
+          }
+
+          .dropdown button {
+              font-size: 18px;
+              padding: 15px;
           }
       }
 
       @media (max-width: 480px) {
-          .header-left span {
-              font-size: 14px;
+          .header-username {
+              font-size: 20px;
           }
 
-          .header-username {
-              font-size: 14px;
+          .dropdown {
+              width: 90%;
           }
+      }
+
+      button {
+          min-height: 50px;
+          touch-action: manipulation;
+      }
+
+      *:focus {
+          outline: 3px solid #cddc39;
+          outline-offset: 2px;
       }
   </style>
 </head>
 <body>
 <header>
   <div class="header-left">
-    <img src="logo.png" alt="Logo Asistente">
-    <span>ASISTENTE DE NAVEGACIÓN PARA PERSONAS CON DISCAPACIDAD</span>
+    <img src="{% static 'images/logo.png' %}" alt="Logo Asistente">
   </div>
+
   <div class="header-right">
-    <span class="header-username">{{ user_name }}</span>
+    <div class="header-username" id="userMenu">
+      {{ request.user.username }}
+      <div class="dropdown" id="dropdownMenu">
+        <form action="{% url 'auth_api:logout' %}" method="post" style="display:inline;">
+          {% csrf_token %}
+          <button type="submit">Cerrar sesión</button>
+        </form>
+      </div>
+    </div>
   </div>
-
-  {% if user.is_authenticated %}
-    <form action="{% url 'auth_api:logout' %}" method="post" style="display:inline;">
-      {% csrf_token %}
-      <button type="submit" class="btn btn-danger btn-sm">Cerrar sesión</button>
-    </form>
-  {% endif %}
-
 </header>
+
 <main class="container">
   {% block content %}
-
   {% endblock %}
 </main>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const userMenu = document.getElementById("userMenu");
+    const dropdown = document.getElementById("dropdownMenu");
+
+    // Toggle al hacer clic en el nombre de usuario
+    userMenu.addEventListener("click", function (e) {
+      e.stopPropagation(); // evita que cierre inmediatamente
+      dropdown.classList.toggle("active");
+    });
+
+    // Cerrar si se hace clic fuera
+    document.addEventListener("click", function (e) {
+      if (!userMenu.contains(e.target)) {
+        dropdown.classList.remove("active");
+      }
+    });
+  });
+</script>
 </body>
 </html>
