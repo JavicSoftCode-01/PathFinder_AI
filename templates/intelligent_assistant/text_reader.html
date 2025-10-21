@@ -1,0 +1,372 @@
+{% extends '../core/components/base.html' %}
+{% load static %}
+
+{% block content %}
+  <style>
+      :root {
+          --bg-gradient-start: #3b206b;
+          --bg-gradient-end: #5d33a3;
+          --text-color: #ffffff;
+          --btn-read-bg: #9acd32;
+          --btn-pause-bg: #808080;
+          --btn-repeat-bg: #87ceeb;
+          --btn-back-bg: #c94c4c;
+          --focus-outline: #f0e68c;
+          --status-bg: rgba(0, 0, 0, 0.5);
+      }
+
+      .reader-container {
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          align-items: center;
+          flex-grow: 1;
+          padding: 20px;
+          box-sizing: border-box;
+          width: 100%;
+          max-width: 900px;
+          margin: 0 auto;
+          text-align: center;
+      }
+
+      .reader-title {
+          font-size: 2rem;
+          font-weight: bold;
+          text-transform: uppercase;
+          margin-bottom: 5px;
+      }
+
+      .reader-subtitle {
+          font-size: 1.2rem;
+          margin-bottom: 20px;
+          opacity: 0.9;
+      }
+
+      .camera-container {
+          position: relative;
+          width: 100%;
+          max-width: 640px;
+          background-color: #000;
+          border: 8px solid #666;
+          border-radius: 20px;
+          overflow: hidden;
+          margin-bottom: 20px;
+          min-height: 360px;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+      }
+
+      #video-feed {
+          width: 100%;
+          height: auto;
+          display: block;
+      }
+
+      .loader {
+          position: absolute;
+          border: 8px solid #f3f3f3;
+          border-top: 8px solid var(--btn-read-bg);
+          border-radius: 50%;
+          width: 60px;
+          height: 60px;
+          animation: spin 1s linear infinite;
+          display: none;
+      }
+
+      @keyframes spin {
+          0% {
+              transform: rotate(0deg);
+          }
+          100% {
+              transform: rotate(360deg);
+          }
+      }
+
+      .status-bar {
+          background-color: var(--status-bg);
+          padding: 10px 20px;
+          border-radius: 25px;
+          margin-bottom: 20px;
+          width: 100%;
+          max-width: 640px;
+      }
+
+      #status-text {
+          color: var(--focus-outline);
+          font-weight: bold;
+          margin-bottom: 5px;
+      }
+
+      #detected-text {
+          font-size: 1.1rem;
+          min-height: 20px;
+      }
+
+      .controls {
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: center;
+          gap: 15px;
+          width: 100%;
+      }
+
+      .btn-reader {
+          border: none;
+          padding: 15px 25px;
+          font-size: 1rem;
+          font-weight: bold;
+          border-radius: 10px;
+          cursor: pointer;
+          transition: transform 0.2s;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+      }
+
+      .btn-reader:disabled {
+          cursor: not-allowed;
+          opacity: 0.6;
+      }
+
+      .btn-read {
+          background-color: var(--btn-read-bg);
+          color: #333;
+      }
+
+      .btn-pause {
+          background-color: var(--btn-pause-bg);
+          color: white;
+      }
+
+      .btn-repeat {
+          background-color: var(--btn-repeat-bg);
+          color: #333;
+      }
+
+      .btn-back {
+          background-color: var(--btn-back-bg);
+          color: white;
+          text-decoration: none;
+          border-radius: 25px;
+      }
+  </style>
+
+  <div class="reader-container">
+    <h1 class="reader-title">Lectura de Textos</h1>
+    <p class="reader-subtitle">Apunta la cámara y presiona "Capturar texto"</p>
+    <div class="camera-container">
+      <video id="video-feed" playsinline muted autoplay></video>
+      <div class="loader" id="loader"></div>
+    </div>
+    <div class="status-bar">
+      <p id="status-text">Cámara inactiva</p>
+      <p id="detected-text">Texto detectado: ...</p>
+    </div>
+    <div class="controls">
+      <button class="btn-reader btn-read" id="main-button">▷ Activar cámara</button>
+      <button class="btn-reader btn-pause" id="btn-pause" disabled>❚❚ Pausar</button>
+      <button class="btn-reader btn-repeat" id="btn-repeat" disabled>🔁 Repetir</button>
+      <a href="{% url 'auth_api:core:home' %}" class="btn-reader btn-back" id="btn-back">🏠 Volver al menú principal</a>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // --- Referencias a elementos del DOM ---
+      const video = document.getElementById('video-feed');
+      const statusText = document.getElementById('status-text');
+      const detectedText = document.getElementById('detected-text');
+      const mainButton = document.getElementById('main-button');
+      const btnPause = document.getElementById('btn-pause');
+      const btnRepeat = document.getElementById('btn-repeat');
+      const btnBack = document.getElementById('btn-back');
+      const loader = document.getElementById('loader');
+
+      // --- Estado de la aplicación ---
+      const synthesis = window.speechSynthesis;
+      let isCameraOn = false;
+      let isProcessing = false;
+      let lastSpokenText = "";
+      let stream; // Variable para mantener la referencia al stream de la cámara
+
+      // --- Funciones principales ---
+
+      /**
+       * Función centralizada para hablar texto.
+       * Cancela cualquier discurso anterior y maneja los estados de los botones.
+       * @param {string} text - El texto a leer en voz alta.
+       * @param {function} onEndCallback - Función a ejecutar cuando el discurso termine.
+       */
+      function speak(text, onEndCallback = () => {
+      }) {
+        if (!text || text.trim() === "") {
+          onEndCallback();
+          return;
+        }
+        // Asegurarse de cancelar cualquier discurso pendiente
+        if (synthesis.speaking) synthesis.cancel();
+
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'es-ES';
+
+        utterance.onstart = () => {
+          statusText.textContent = 'Lectura en voz alta activa...';
+          btnPause.disabled = false;
+          btnPause.textContent = '❚❚ Pausar';
+        };
+
+        utterance.onend = () => {
+          statusText.textContent = isCameraOn ? 'Cámara activa. Listo para capturar.' : 'Cámara inactiva.';
+          btnPause.textContent = '❚❚ Pausar';
+          btnPause.disabled = true;
+          onEndCallback();
+        };
+
+        // Manejar el caso en que la síntesis de voz falle o sea interrumpida
+        utterance.onerror = (event) => {
+          console.error("Error en la síntesis de voz:", event);
+          onEndCallback(); // Asegurarse de que el flujo continúe
+        };
+
+        lastSpokenText = text;
+        btnRepeat.disabled = false;
+        synthesis.speak(utterance);
+      }
+
+      /**
+       * Inicia la cámara y actualiza la UI.
+       */
+      async function startCamera() {
+        mainButton.disabled = true; // Deshabilitar mientras se activa
+        statusText.textContent = 'Iniciando cámara...';
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({video: {facingMode: 'environment'}});
+          video.srcObject = stream;
+          await video.play();
+          isCameraOn = true;
+          mainButton.textContent = '📸 Capturar texto';
+          mainButton.disabled = false;
+          statusText.textContent = 'Cámara activa. Apunte y presione "Capturar texto".';
+          speak("Cámara activada. Apunte y presione el botón para capturar el texto.");
+        } catch (err) {
+          console.error("Error al acceder a la cámara:", err);
+          statusText.textContent = 'Error al acceder a la cámara.';
+          mainButton.textContent = '▷ Reintentar activar cámara';
+          mainButton.disabled = false;
+          speak("No se pudo acceder a la cámara. Por favor, revise los permisos en su navegador.");
+        }
+      }
+
+      /**
+       * Detiene las pistas de la cámara y cancela cualquier discurso.
+       */
+      function stopCameraAndSpeech() {
+        if (synthesis.speaking) synthesis.cancel();
+        if (stream) {
+          stream.getTracks().forEach(track => track.stop());
+        }
+        video.srcObject = null;
+        isCameraOn = false;
+        mainButton.textContent = '▷ Activar cámara';
+        mainButton.disabled = false;
+        statusText.textContent = 'Cámara inactiva';
+        btnPause.disabled = true;
+        btnRepeat.disabled = true;
+        loader.style.display = 'none';
+        isProcessing = false;
+      }
+
+      /**
+       * Captura un frame, lo envía al backend y gestiona el flujo de voz.
+       */
+      async function captureAndProcessFrame() {
+        if (!isCameraOn || isProcessing || video.readyState < 2) return;
+
+        isProcessing = true;
+        mainButton.disabled = true; // <--- Bloquea el botón al iniciar
+        loader.style.display = 'block';
+        statusText.textContent = 'Analizando imagen con la IA...';
+        detectedText.textContent = "Texto detectado: ...";
+        btnPause.disabled = true;
+        btnRepeat.disabled = true;
+
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+        const imageData = canvas.toDataURL('image/jpeg');
+
+        try {
+          const response = await fetch(window.location.href, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({image_data: imageData}),
+          });
+
+          loader.style.display = 'none'; // <--- Oculta el loader en cuanto llega la respuesta
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `Error del servidor: ${response.status}`);
+          }
+
+          const result = await response.json();
+          const newText = result.text || "No se detectó texto o contenido.";
+          detectedText.textContent = `Resultado: "${newText}"`;
+
+          // Inicia la secuencia de voz: primero el resultado, luego el mensaje final
+          speak(newText, () => {
+            speak("Vuelva a capturar otro texto si lo desea.", () => {
+              // Este es el final de todo el proceso.
+              isProcessing = false;
+              mainButton.disabled = false; // <--- Reactiva el botón
+            });
+          });
+
+        } catch (error) {
+          console.error("Error procesando el frame:", error);
+          const errorMessage = `Ocurrió un error: ${error.message}`;
+          statusText.textContent = errorMessage;
+          loader.style.display = 'none';
+          // Hablar el error y luego reactivar el botón
+          speak(errorMessage, () => {
+            isProcessing = false;
+            mainButton.disabled = false;
+          });
+        }
+      }
+
+      // --- Asignación de Event Listeners ---
+
+      mainButton.addEventListener('click', () => {
+        isCameraOn ? captureAndProcessFrame() : startCamera();
+      });
+
+      btnPause.addEventListener('click', () => {
+        if (synthesis.speaking) {
+          if (synthesis.paused) {
+            synthesis.resume();
+            btnPause.textContent = '❚❚ Pausar';
+          } else {
+            synthesis.pause();
+            btnPause.textContent = '▶ Reanudar';
+          }
+        }
+      });
+
+      btnRepeat.addEventListener('click', () => {
+        // Usa una función speak sin callback para no interferir con el estado
+        if (lastSpokenText) speak(lastSpokenText);
+      });
+
+      // El evento 'pagehide' es más fiable que 'beforeunload' en móviles.
+      // Se dispara cuando el usuario navega fuera de la página.
+      window.addEventListener('pagehide', stopCameraAndSpeech);
+
+      // Mensaje de bienvenida inicial
+      speak("Bienvenido al módulo de lectura. Presione 'Activar cámara' para empezar.");
+    });
+  </script>
+{% endblock %}

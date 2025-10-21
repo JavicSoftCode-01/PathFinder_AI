@@ -10,8 +10,14 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import os
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -108,6 +114,14 @@ AUTH_PASSWORD_VALIDATORS = [
     'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
   },
 ]
+
+# --- CONFIGURACIÓN DE CORREO ELECTRÓNICO ---
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'javicsoftcode@gmail.com'
+EMAIL_HOST_PASSWORD = 'ejxh xori lpsp znrt'
 
 AUTH_USER_MODEL = 'auth_api.CustomUser'
 

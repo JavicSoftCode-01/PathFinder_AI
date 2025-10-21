@@ -16,26 +16,26 @@ class UserFeedback(models.Model):
 
 
 class TrainingExercise(models.Model):
-    command_text = models.CharField(
-      _("Texto del Comando a Decir"),
-      max_length=255,
-      help_text="El comando exacto que el usuario debe decir. Ej: 'Activar detección de obstáculos'"
-    )
-    explanation_text = models.TextField(
-      _("Explicación del Comando"),
-      blank=True,
-      help_text="Una breve descripción de lo que hace el comando (para la sección 'Ver ejemplos')."
-    )
-    order = models.PositiveIntegerField(
-      _("Orden"),
-      default=0,
-      help_text="El orden en que aparecerá el ejercicio (0 primero, 1 después, etc.)."
-    )
+  command_text = models.CharField(
+    _("Texto del Comando a Decir"),
+    max_length=255,
+    help_text="El comando exacto que el usuario debe decir. Ej: 'Activar detección de obstáculos'"
+  )
+  explanation_text = models.TextField(
+    _("Explicación del Comando"),
+    blank=True,
+    help_text="Una breve descripción de lo que hace el comando (para la sección 'Ver ejemplos')."
+  )
+  order = models.PositiveIntegerField(
+    _("Orden"),
+    default=0,
+    help_text="El orden en que aparecerá el ejercicio (0 primero, 1 después, etc.)."
+  )
 
-    class Meta:
-      verbose_name = _("Ejercicio de Entrenamiento")
-      verbose_name_plural = _("Ejercicios de Entrenamiento")
-      ordering = ['order']
+  class Meta:
+    verbose_name = _("Ejercicio de Entrenamiento")
+    verbose_name_plural = _("Ejercicios de Entrenamiento")
+    ordering = ['order']
 
-    def __str__(self):
-      return f"Ejercicio {self.order}: {self.command_text}"
+  def __str__(self):
+    return f"Ejercicio {self.order}: {self.command_text}"

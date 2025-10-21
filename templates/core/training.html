@@ -1,284 +1,3 @@
-{#{% extends './components/base.html' %}#}
-{#{% load static %}#}
-{##}
-{#{% block content %}#}
-{#  {{ exercises|json_script:"exercises-data" }}#}
-{##}
-{#  <style>#}
-{#      :root {#}
-{#          --bg-gradient-start: #3b206b;#}
-{#          --bg-gradient-end: #5d33a3;#}
-{#          --text-color: #ffffff;#}
-{#          --btn-start-bg: #9acd32;#}
-{#          --btn-examples-bg: #87ceeb;#}
-{#          --btn-practice-bg: #d3d3d3;#}
-{#          --btn-back-bg: #c94c4c;#}
-{#          --focus-outline: #f0e68c;#}
-{#          --feedback-bg: rgba(0, 0, 0, 0.2);#}
-{#      }#}
-{##}
-{#      .training-container {#}
-{#          display: flex;#}
-{#          flex-direction: column;#}
-{#          justify-content: center;#}
-{#          align-items: center;#}
-{#          flex-grow: 1;#}
-{#          padding: 20px;#}
-{#          box-sizing: border-box;#}
-{#          width: 100%;#}
-{#          max-width: 800px;#}
-{#          margin: 0 auto;#}
-{#          text-align: center;#}
-{#      }#}
-{##}
-{#      .training-title {#}
-{#          font-size: 2rem;#}
-{#          font-weight: bold;#}
-{#          text-transform: uppercase;#}
-{#          margin-bottom: 10px;#}
-{#      }#}
-{##}
-{#      .training-subtitle {#}
-{#          font-size: 1.3rem;#}
-{#          margin-bottom: 30px;#}
-{#          color: var(--text-color);#}
-{#          opacity: 0.9;#}
-{#      }#}
-{##}
-{#      .action-buttons {#}
-{#          display: flex;#}
-{#          flex-direction: column;#}
-{#          gap: 15px;#}
-{#          width: 100%;#}
-{#          max-width: 450px;#}
-{#          margin-bottom: 30px;#}
-{#      }#}
-{##}
-{#      .btn-training {#}
-{#          border: none;#}
-{#          color: var(--text-color);#}
-{#          background-color: var(--btn-start-bg);#}
-{#          padding: 18px;#}
-{#          font-size: 1.2rem;#}
-{#          font-weight: bold;#}
-{#          border-radius: 12px;#}
-{#          cursor: pointer;#}
-{#          transition: transform 0.2s, box-shadow 0.2s;#}
-{#          display: flex;#}
-{#          align-items: center;#}
-{#          justify-content: center;#}
-{#          gap: 10px;#}
-{#          color: #333;#}
-{#      }#}
-{##}
-{#      .btn-training:hover {#}
-{#          transform: translateY(-3px);#}
-{#          box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);#}
-{#      }#}
-{##}
-{#      .btn-examples {#}
-{#          background-color: var(--btn-examples-bg);#}
-{#      }#}
-{##}
-{#      .btn-practice {#}
-{#          background-color: var(--btn-practice-bg);#}
-{#      }#}
-{##}
-{#      .btn-back {#}
-{#          background-color: var(--btn-back-bg);#}
-{#          color: white;#}
-{#          border-radius: 50px;#}
-{#          text-decoration: none;#}
-{#          margin-top: 20px;#}
-{#      }#}
-{##}
-{#      #exercise-section {#}
-{#          background-color: var(--feedback-bg);#}
-{#          border-radius: 15px;#}
-{#          padding: 25px;#}
-{#          width: 100%;#}
-{#          max-width: 500px;#}
-{#          margin-top: 20px;#}
-{#          display: none;#}
-{#          text-align: left;#}
-{#      }#}
-{##}
-{#      #exercise-section h3 {#}
-{#          margin-top: 0;#}
-{#          font-size: 1.4rem;#}
-{#          border-bottom: 1px solid rgba(255, 255, 255, 0.3);#}
-{#          padding-bottom: 10px;#}
-{#      }#}
-{##}
-{#      #instruction-text {#}
-{#          font-size: 1.2rem;#}
-{#          font-style: italic;#}
-{#          margin: 15px 0;#}
-{#      }#}
-{##}
-{#      #feedback-text {#}
-{#          font-size: 1.1rem;#}
-{#          font-weight: bold;#}
-{#          min-height: 25px;#}
-{#      }#}
-{##}
-{#      @media (max-width: 600px) {#}
-{#          .training-title {#}
-{#              font-size: 1.6rem;#}
-{#          }#}
-{##}
-{#          .training-subtitle {#}
-{#              font-size: 1.1rem;#}
-{#          }#}
-{##}
-{#          .btn-training {#}
-{#              font-size: 1.1rem;#}
-{#              padding: 20px;#}
-{#          }#}
-{#      }#}
-{#  </style>#}
-{##}
-{#  <div class="training-container">#}
-{#    <h1 class="training-title">Modo de Entrenamiento</h1>#}
-{#    <p class="training-subtitle">Practica el uso del asistente con ejercicios guiados</p>#}
-{##}
-{#    <div class="action-buttons">#}
-{#      <button class="btn-training btn-start" id="btn-start-exercise">▶️ Iniciar ejercicio</button>#}
-{#      <button class="btn-training btn-examples" id="btn-view-examples">📖 Ver ejemplos de uso</button>#}
-{#      <button class="btn-training btn-practice" id="btn-practice-commands">🎤 Practicar comandos de voz</button>#}
-{#    </div>#}
-{##}
-{#    <div id="exercise-section">#}
-{#      <h3>🔊 Ejercicio actual:</h3>#}
-{#      <p id="instruction-text">Diga "..."</p>#}
-{#      <p id="feedback-text"></p>#}
-{#    </div>#}
-{##}
-{#    <a href="{% url 'auth_api:core:home' %}" class="btn-training btn-back">🏠 Volver al menú principal</a>#}
-{#  </div>#}
-{##}
-{#  <script>#}
-{#    document.addEventListener('DOMContentLoaded', function () {#}
-{#      // --- Obtener datos y elementos del DOM ---#}
-{##}
-{#      // --- ESTA ES LA CORRECCIÓN ---#}
-{#      // Ahora 'exercises' es directamente la lista de objetos que necesitamos.#}
-{#      const exercises = JSON.parse(document.getElementById('exercises-data').textContent);#}
-{##}
-{#      const btnStart = document.getElementById('btn-start-exercise');#}
-{#      const btnExamples = document.getElementById('btn-view-examples');#}
-{#      const btnPractice = document.getElementById('btn-practice-commands');#}
-{##}
-{#      const exerciseSection = document.getElementById('exercise-section');#}
-{#      const instructionText = document.getElementById('instruction-text');#}
-{#      const feedbackText = document.getElementById('feedback-text');#}
-{##}
-{#      // --- APIs de Voz y Estado ---#}
-{#      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;#}
-{#      const synthesis = window.speechSynthesis;#}
-{#      if (!SpeechRecognition) {#}
-{#        console.error("API de Reconocimiento de Voz no compatible.");#}
-{#        return;#}
-{#      }#}
-{#      const recognition = new SpeechRecognition();#}
-{#      recognition.lang = 'es-ES';#}
-{#      recognition.continuous = false;#}
-{##}
-{#      let currentExerciseIndex = 0;#}
-{#      let isPracticeModeActive = false;#}
-{##}
-{#      // --- Funciones de Voz ---#}
-{#      function speak(text, onEndCallback = () => {#}
-{#      }) {#}
-{#        if (synthesis.speaking) synthesis.cancel();#}
-{#        recognition.stop();#}
-{#        const utterance = new SpeechSynthesisUtterance(text);#}
-{#        utterance.lang = 'es-ES';#}
-{#        utterance.onend = onEndCallback;#}
-{#        synthesis.speak(utterance);#}
-{#      }#}
-{##}
-{#      // --- Lógica Principal del Entrenamiento ---#}
-{#      function startExercise(index) {#}
-{#        if (index >= exercises.length) {#}
-{#          exerciseSection.style.display = 'none';#}
-{#          isPracticeModeActive = false;#}
-{#          speak("Felicidades, ha completado todos los ejercicios de entrenamiento.");#}
-{#          return;#}
-{#        }#}
-{##}
-{#        const exercise = exercises[index];#}
-{#        const commandToSay = exercise.command_text;#}
-{##}
-{#        instructionText.textContent = `Diga "${commandToSay}"`;#}
-{#        feedbackText.textContent = "";#}
-{##}
-{#        speak(`Ejercicio ${index + 1}. Diga: ${commandToSay}`, () => {#}
-{#          if (isPracticeModeActive) recognition.start();#}
-{#        });#}
-{#      }#}
-{##}
-{#      // --- Event Listeners para los botones ---#}
-{#      btnStart.addEventListener('click', () => {#}
-{#        isPracticeModeActive = true;#}
-{#        currentExerciseIndex = 0;#}
-{#        exerciseSection.style.display = 'block';#}
-{#        speak("Iniciando modo de entrenamiento.", () => {#}
-{#          startExercise(currentExerciseIndex);#}
-{#        });#}
-{#      });#}
-{##}
-{#      btnExamples.addEventListener('click', () => {#}
-{#        isPracticeModeActive = false;#}
-{#        exerciseSection.style.display = 'none';#}
-{#        if (exercises.length === 0) {#}
-{#          speak("No hay ejemplos para mostrar.");#}
-{#          return;#}
-{#        }#}
-{##}
-{#        let fullExplanation = "Escuche los siguientes ejemplos de uso. ";#}
-{#        exercises.forEach(ex => {#}
-{#          fullExplanation += `El comando: ${ex.command_text}. Sirve para: ${ex.explanation_text || 'esta acción'}. `;#}
-{#        });#}
-{#        speak(fullExplanation);#}
-{#      });#}
-{##}
-{#      btnPractice.addEventListener('click', () => btnStart.click());#}
-{##}
-{#      // --- Manejo de Resultados de Voz ---#}
-{#      recognition.onresult = (event) => {#}
-{#        if (!isPracticeModeActive) return;#}
-{##}
-{#        const transcript = event.results[0][0].transcript.trim().toLowerCase();#}
-{#        const expectedCommand = exercises[currentExerciseIndex].command_text.trim().toLowerCase();#}
-{##}
-{#        const cleanTranscript = transcript.replace(/[.,]/g, '');#}
-{#        const cleanExpected = expectedCommand.replace(/[.,]/g, '');#}
-{##}
-{#        if (cleanTranscript === cleanExpected) {#}
-{#          feedbackText.textContent = "✅ Correcto, continúe al siguiente.";#}
-{#          speak("Correcto. Siguiente ejercicio.", () => {#}
-{#            currentExerciseIndex++;#}
-{#            setTimeout(() => startExercise(currentExerciseIndex), 1000);#}
-{#          });#}
-{#        } else {#}
-{#          feedbackText.textContent = `❌ Se esperaba "${expectedCommand}". Se escuchó "${transcript}". Intente de nuevo.`;#}
-{#          speak("Comando incorrecto. Por favor, intente de nuevo.", () => {#}
-{#            if (isPracticeModeActive) recognition.start();#}
-{#          });#}
-{#        }#}
-{#      };#}
-{##}
-{#      recognition.onerror = (event) => {#}
-{#        if (isPracticeModeActive) {#}
-{#          speak("No pude escuchar. Por favor, hable más claro.");#}
-{#        }#}
-{#      };#}
-{##}
-{#      speak("Bienvenido al modo de entrenamiento. Puede iniciar un ejercicio, ver ejemplos o volver al menú principal.");#}
-{#    });#}
-{#  </script>#}
-{#{% endblock %}#}
 {% extends './components/base.html' %}
 {% load static %}
 
@@ -286,6 +5,7 @@
   {{ exercises|json_script:"exercises-data" }}
 
   <style>
+      /* --- TU CSS (SIN CAMBIOS) --- */
       :root {
           --bg-gradient-start: #3b206b;
           --bg-gradient-end: #5d33a3;
@@ -404,9 +124,8 @@
           min-height: 25px;
       }
 
-      /* --- ESTILOS PARA LA NUEVA VENTANA MODAL --- */
       .modal {
-          display: none; /* Oculto por defecto */
+          display: none;
           position: fixed;
           z-index: 1000;
           left: 0;
@@ -510,63 +229,90 @@
       <p id="feedback-text"></p>
     </div>
 
-    <a href="{% url 'auth_api:core:home' %}" class="btn-training btn-back">🏠 Volver al menú principal</a>
+    <!-- 🔥 CORRECCIÓN: Se añade un ID al botón de volver para referenciarlo fácilmente -->
+    <a href="{% url 'auth_api:core:home' %}" class="btn-training btn-back" id="btn-back-link">🏠 Volver al menú
+      principal</a>
   </div>
 
-  <!-- --- HTML DE LA NUEVA VENTANA MODAL --- -->
   <div id="examples-modal" class="modal">
     <div class="modal-content">
       <div class="modal-header">
         <h2 class="modal-title">📖 Ejemplos de Comandos</h2>
-        <button class="modal-close" id="modal-close-btn">&times;</button>
+        <button class="modal-close" id="modal-close-btn">CERRAR</button>
       </div>
-      <ul id="examples-list">
-        <!-- El contenido se generará con JavaScript -->
-      </ul>
+      <ul id="examples-list"></ul>
     </div>
   </div>
 
-
   <script>
     document.addEventListener('DOMContentLoaded', function () {
+      // --- Referencias a elementos del DOM ---
       const exercises = JSON.parse(document.getElementById('exercises-data').textContent);
-
       const btnStart = document.getElementById('btn-start-exercise');
       const btnExamples = document.getElementById('btn-view-examples');
       const btnPractice = document.getElementById('btn-practice-commands');
-
+      const btnBack = document.getElementById('btn-back-link'); // <-- Referencia al botón de volver
       const exerciseSection = document.getElementById('exercise-section');
       const instructionText = document.getElementById('instruction-text');
       const feedbackText = document.getElementById('feedback-text');
-
-      // --- NUEVOS ELEMENTOS PARA LA MODAL ---
       const modal = document.getElementById('examples-modal');
       const btnModalClose = document.getElementById('modal-close-btn');
       const examplesList = document.getElementById('examples-list');
 
+      // --- APIs de Voz ---
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       const synthesis = window.speechSynthesis;
+
       if (!SpeechRecognition) {
-        console.error("API de Voz no compatible.");
+        // Manejar el caso en que la API no sea compatible
+        console.error("API de Reconocimiento de Voz no compatible.");
+        const allButtons = document.querySelectorAll('.btn-training');
+        allButtons.forEach(btn => btn.disabled = true);
+        const subtitle = document.querySelector('.training-subtitle');
+        subtitle.textContent = "Lo sentimos, tu navegador no es compatible con el entrenamiento por voz.";
         return;
       }
       const recognition = new SpeechRecognition();
       recognition.lang = 'es-ES';
-      recognition.continuous = false;
+      recognition.continuous = false; // Solo escucha una vez por cada .start()
 
-      let currentExerciseIndex = 0;
+      // --- Estado de la aplicación ---
       let isPracticeModeActive = false;
+      let currentExerciseIndex = 0;
 
+      // --- Funciones de control de voz ---
+
+      /**
+       * Detiene inmediatamente cualquier síntesis de voz y reconocimiento en curso.
+       * Esta es la función clave para limpiar el estado.
+       */
+      function stopAllVoiceActivity() {
+        synthesis.cancel(); // Detiene la voz que está hablando
+        recognition.stop(); // Detiene el micrófono que está escuchando
+      }
+
+      /**
+       * Lee un texto en voz alta.
+       * @param {string} text - El texto a leer.
+       * @param {function} [onEndCallback] - Función a ejecutar cuando termine de hablar.
+       */
       function speak(text, onEndCallback = () => {
       }) {
-        if (synthesis.speaking) synthesis.cancel();
-        recognition.stop();
+        stopAllVoiceActivity(); // Asegura un estado limpio antes de hablar
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'es-ES';
         utterance.onend = onEndCallback;
+        utterance.onerror = (event) => {
+          console.error("Error en la síntesis de voz:", event);
+          onEndCallback(); // Asegura que el flujo continúe incluso si hay un error
+        };
         synthesis.speak(utterance);
       }
 
+      /**
+       * Inicia un ejercicio específico o finaliza el entrenamiento.
+       * @param {number} index - El índice del ejercicio a iniciar.
+       */
       function startExercise(index) {
         if (index >= exercises.length) {
           exerciseSection.style.display = 'none';
@@ -578,13 +324,15 @@
         instructionText.textContent = `Diga "${exercise.command_text}"`;
         feedbackText.textContent = "";
         speak(`Ejercicio ${index + 1}. Diga: ${exercise.command_text}`, () => {
+          // Solo empieza a escuchar si todavía estamos en modo práctica
           if (isPracticeModeActive) recognition.start();
         });
       }
 
-      // --- LÓGICA PARA LA NUEVA MODAL ---
+      // --- Funciones de la Interfaz (Modal) ---
+
       function openExamplesModal() {
-        examplesList.innerHTML = ''; // Limpiar lista anterior
+        examplesList.innerHTML = '';
         if (exercises.length === 0) {
           examplesList.innerHTML = '<li>No hay ejemplos para mostrar.</li>';
         } else {
@@ -599,9 +347,11 @@
 
       function closeExamplesModal() {
         modal.style.display = 'none';
+        stopAllVoiceActivity(); // Detiene la voz al cerrar el modal
       }
 
-      // --- Event Listeners ---
+      // --- Lógica de Event Listeners ---
+
       btnStart.addEventListener('click', () => {
         isPracticeModeActive = true;
         currentExerciseIndex = 0;
@@ -613,46 +363,53 @@
         isPracticeModeActive = false;
         exerciseSection.style.display = 'none';
 
-        // ACCIÓN DUAL: Muestra la modal Y habla al mismo tiempo.
         openExamplesModal();
 
         if (exercises.length === 0) {
           speak("No hay ejemplos para mostrar.");
           return;
         }
-        let fullExplanation = "Escuche y vea los siguientes ejemplos de uso. ";
+
+        let fullExplanation = "Escuche atentamente los siguientes ejemplos de uso. ";
         exercises.forEach(ex => {
           fullExplanation += `El comando: ${ex.command_text}. Sirve para: ${ex.explanation_text || 'esta acción'}. `;
         });
         speak(fullExplanation);
       });
 
+      // El botón de práctica simplemente simula un clic en el de iniciar.
       btnPractice.addEventListener('click', () => btnStart.click());
 
-      // Listeners para cerrar la modal
+      // Listeners para cerrar el modal
       btnModalClose.addEventListener('click', closeExamplesModal);
       modal.addEventListener('click', (event) => {
-        if (event.target === modal) closeExamplesModal(); // Cierra si se hace clic en el fondo
+        if (event.target === modal) closeExamplesModal();
       });
       document.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape' && modal.style.display === 'flex') {
-          closeExamplesModal();
-        }
+        if (event.key === 'Escape' && modal.style.display === 'flex') closeExamplesModal();
       });
 
-      // --- Manejo de Resultados de Voz (sin cambios) ---
+      // --- 🔥 CORRECCIÓN CLAVE: Detener todo al salir de la página ---
+      // El evento 'pagehide' es la forma más fiable de limpiar antes de que el usuario abandone la página.
+      window.addEventListener('pagehide', stopAllVoiceActivity);
+
+      // También detenemos la voz inmediatamente al hacer clic en el enlace de "Volver".
+      btnBack.addEventListener('click', stopAllVoiceActivity);
+
+      // --- Manejo de Resultados y Errores del Reconocimiento de Voz ---
       recognition.onresult = (event) => {
-        if (!isPracticeModeActive) return;
+        if (!isPracticeModeActive) return; // Ignorar si no estamos en modo práctica
+
         const transcript = event.results[0][0].transcript.trim().toLowerCase();
         const expectedCommand = exercises[currentExerciseIndex].command_text.trim().toLowerCase();
-        const cleanTranscript = transcript.replace(/[.,]/g, '');
-        const cleanExpected = expectedCommand.replace(/[.,]/g, '');
+        const cleanTranscript = transcript.replace(/[.,¡!¿?]/g, '');
+        const cleanExpected = expectedCommand.replace(/[.,¡!¿?]/g, '');
 
         if (cleanTranscript === cleanExpected) {
           feedbackText.textContent = "✅ Correcto, continúe al siguiente.";
           speak("Correcto. Siguiente ejercicio.", () => {
             currentExerciseIndex++;
-            setTimeout(() => startExercise(currentExerciseIndex), 1000);
+            setTimeout(() => startExercise(currentExerciseIndex), 500); // Pequeña pausa
           });
         } else {
           feedbackText.textContent = `❌ Se esperaba "${expectedCommand}". Se escuchó "${transcript}". Intente de nuevo.`;
@@ -663,10 +420,21 @@
       };
 
       recognition.onerror = (event) => {
-        if (isPracticeModeActive) speak("No pude escuchar. Por favor, hable más claro.");
+        if (isPracticeModeActive) {
+          if (event.error === 'no-speech' || event.error === 'audio-capture') {
+            speak("No pude escuchar. Por favor, hable más claro e inténtelo de nuevo.", () => {
+              if (isPracticeModeActive) recognition.start();
+            });
+          } else if (event.error === 'not-allowed') {
+            speak("El acceso al micrófono fue denegado. Por favor, revise los permisos.");
+            isPracticeModeActive = false; // Salir del modo práctica
+          }
+        }
       };
 
+      // --- Mensaje de bienvenida inicial ---
       speak("Bienvenido al modo de entrenamiento. Puede iniciar un ejercicio, ver ejemplos o volver al menú principal.");
     });
   </script>
+
 {% endblock %}

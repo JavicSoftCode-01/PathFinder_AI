@@ -1,121 +1,180 @@
 {% extends './components/base.html' %}
 {% load static %}
-
 {% block content %}
+  {% csrf_token %} {# Importante para que el AJAX pueda obtener el token #}
   <style>
+      :root {
+          --primary-bg: #2c1a4d; /* Un morado más oscuro como en la imagen */
+          --text-color: #ffffff;
+          --alert-red: #d93636;
+          --info-brown: #3a2e2e;
+          --cancel-green: #4f854e;
+          --pulse-color: rgba(255, 255, 255, 0.7);
+      }
+
       .emergency-container {
-          max-width: 800px;
-          margin: 0 auto;
+          max-width: 900px;
+          margin: 20px auto;
+          padding: 20px;
           text-align: center;
-          color: white;
+          color: var(--text-color);
       }
 
       .emergency-container h1 {
-          font-size: 28px;
-          margin-bottom: 10px;
+          font-size: 2rem;
+          font-weight: bold;
+          text-transform: uppercase;
+          margin-bottom: 5px;
       }
 
       .emergency-container h1 .sos {
-          color: #e53e3e;
+          color: var(--alert-red);
+          font-weight: 900;
       }
 
       .subtitle {
-          font-size: 18px;
+          font-size: 1.2rem;
           margin-bottom: 30px;
+          opacity: 0.9;
       }
 
       .emergency-main {
           display: flex;
-          gap: 20px;
+          gap: 30px;
           margin-bottom: 30px;
       }
 
-      .left-card {
-          background-color: #e53e3e;
-          border-radius: 20px;
-          padding: 40px 20px;
-          flex: 1;
+      /* Botón de Alerta (Izquierda) */
+      .alert-card {
+          background-color: var(--alert-red);
+          border-radius: 15px;
+          padding: 20px;
+          flex: 1.2; /* Ligeramente más grande */
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          color: white;
-          font-size: 24px;
+          color: var(--text-color);
+          font-size: 2rem;
           font-weight: bold;
           text-decoration: none;
-          transition: transform 0.2s;
+          cursor: pointer;
+          position: relative; /* Para la animación de pulso */
+          box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+          border: 2px solid transparent;
       }
 
-      .left-card:hover {
-          transform: scale(1.05);
+      .alert-card:active {
+          transform: scale(0.98);
       }
 
-      .left-card img {
-          width: 150px;
-          height: auto;
-          margin-top: 20px;
+      .alert-card .icon-container img {
+          width: 120px;
+          margin-top: 15px;
       }
 
-      .right-info {
-          background-color: #424242;
-          border-radius: 20px;
-          padding: 20px;
+      /* Animación de Ondas/Pulso */
+      .alert-card.pulsing::before {
+          content: '';
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          width: 100%;
+          height: 100%;
+          background-color: transparent;
+          border: 3px solid var(--pulse-color);
+          border-radius: 15px;
+          transform: translate(-50%, -50%) scale(1);
+          opacity: 0;
+          animation: pulse 2s infinite;
+      }
+
+      @keyframes pulse {
+          0% {
+              transform: translate(-50%, -50%) scale(0.95);
+              opacity: 0.7;
+          }
+          70% {
+              transform: translate(-50%, -50%) scale(1.2);
+              opacity: 0;
+          }
+          100% {
+              transform: translate(-50%, -50%) scale(0.95);
+              opacity: 0;
+          }
+      }
+
+      /* Panel de Información (Derecha) */
+      .info-panel {
+          background-color: var(--info-brown);
+          border-radius: 15px;
+          padding: 25px;
           flex: 1;
           text-align: left;
       }
 
-      .right-info h2 {
-          font-size: 20px;
+      .info-panel h2 {
+          font-size: 1.3rem;
+          margin-top: 0;
           margin-bottom: 20px;
-          display: flex;
-          align-items: center;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+          padding-bottom: 10px;
       }
 
-      .right-info h2 img {
-          width: 20px;
-          height: 20px;
-          margin-right: 10px;
-      }
-
-      .right-info ul {
+      .info-panel ul {
           list-style: none;
           padding: 0;
+          margin: 0;
       }
 
-      .right-info li {
+      .info-panel li {
           display: flex;
           align-items: center;
           margin-bottom: 15px;
-          font-size: 16px;
+          font-size: 1rem;
       }
 
-      .right-info li img {
-          width: 20px;
-          height: 20px;
+      .info-panel li a {
+          color: #87ceeb;
+          text-decoration: underline;
+      }
+
+      .info-panel .check-icon {
+          display: block;
+          margin: 20px auto 0;
+          width: 50px;
+      }
+
+      /* Botón de Cancelar y Countdown */
+      .cancel-btn {
+          background-color: var(--cancel-green);
+          color: var(--text-color);
+          padding: 15px 30px;
+          border: none;
+          border-radius: 50px;
+          font-size: 1.2rem;
+          cursor: pointer;
+          display: none; /* Oculto por defecto */
+          margin: 0 auto;
+          font-weight: bold;
+      }
+
+      #countdown-display {
+          font-size: 1.5rem;
+          font-weight: bold;
+          margin-bottom: 15px;
+          display: none; /* Oculto por defecto */
+      }
+
+      /* Estilos de íconos genéricos */
+      .icon {
+          vertical-align: middle;
           margin-right: 10px;
       }
 
-      .right-info .check {
-          width: 40px;
-          height: 40px;
-          display: block;
-          margin: 20px auto 0;
-      }
-
-      .cancel {
-          background-color: #4caf50;
-          color: white;
-          padding: 10px 20px;
-          border: none;
-          border-radius: 20px;
-          font-size: 16px;
-          cursor: pointer;
-          display: block;
-          margin: 0 auto;
-      }
-
-      .cancel:hover {
-          background-color: #388e3c;
+      .speaker-icon {
+          font-size: 1rem;
+          opacity: 0.8;
       }
 
       /* Responsividad */
@@ -124,95 +183,205 @@
               flex-direction: column;
           }
 
-          .left-card {
-              padding: 30px 20px;
+          .alert-card {
+              padding: 40px 20px;
+              font-size: 1.8rem;
           }
 
-          .left-card img {
-              width: 120px;
-          }
-      }
-
-      @media (max-width: 480px) {
-          .emergency-container h1 {
-              font-size: 24px;
-          }
-
-          .subtitle {
-              font-size: 16px;
-          }
-
-          .left-card {
-              font-size: 20px;
-          }
-
-          .right-info li {
-              font-size: 14px;
+          .cancel-btn {
+              width: 100%;
+              max-width: 400px;
           }
       }
   </style>
+
   <div class="emergency-container">
     <h1>EMERGENCIA <span class="sos">SOS</span></h1>
-    <p class="subtitle">Envía tu ubicación de inmediato a tu contacto registrado</p>
+    <p class="subtitle">Envía tu ubicación de inmediato a tu contacto registrado <span class="speaker-icon">🔊</span></p>
+
     <div class="emergency-main">
-      <a href="#" class="left-card" id="send-alert">
-        <p>Enviar alerta</p>
-        <img src="https://www.shutterstock.com/image-vector/sos-emergency-call-phone-message-260nw-2262032009.jpg"
-             alt="SOS Icon">
-      </a>
-      <div class="right-info">
-        <h2><img src="https://upload.wikimedia.org/wikipedia/commons/3/37/Eo_circle_blue_info.svg" alt="Info Icon">
-          Información del Usuario</h2>
+      <div class="alert-card pulsing" id="send-alert-btn">
+        <p>Enviar alerta <span class="speaker-icon">🔊</span></p>
+        <div class="icon-container">
+          <img src="https://static.vecteezy.com/system/resources/previews/005/568/095/non_2x/sos-bell-in-red-circle-icon-alarm-bell-symbol-isolated-on-white-background-free-vector.jpg" alt="SOS Icon">
+        </div>
+      </div>
+      <div class="info-panel">
+        <h2>ℹ️ Información del Usuario</h2>
         <ul>
-          <li><img src="https://cdn-icons-png.freepik.com/512/63/63699.png" alt="User Icon">
-            Nombre: {{ request.user.full_name }}</li>
-          <li><img
-                  src="https://static.vecteezy.com/system/resources/previews/006/085/363/non_2x/simple-phone-voice-call-icon-free-vector.jpg"
-                  alt="Phone Icon"> Contacto de emergencia: {{ request.user.emergency_contact }}</li>
-          {% if request.user.alternative_contact %}
-            <li><img
-                    src="https://static.vecteezy.com/system/resources/previews/006/085/363/non_2x/simple-phone-voice-call-icon-free-vector.jpg"
-                    alt="Phone Icon"> Contacto alternativo: {{ request.user.alternative_contact }}</li>
+          <li><span class="icon">👤</span> <b>Nombre:</b> {{ full_name }}</li>
+          <li><span class="icon">📞</span> <b>Contacto de emergencia:</b> {{ emergency_contact }}</li>
+          {% if alternative_contact %}
+            <li><span class="icon">📞</span> <b>Contacto alternativo:</b> {{ alternative_contact }}</li>
           {% endif %}
-          <li><img src="https://cdn-icons-png.flaticon.com/512/1077/1077063.png" alt="Age Icon"> Correo
-            Emergencia: {{ request.user.emailEmergency }}</li>
-          {% if request.user.emailAlternative %}
-            <li><img src="https://cdn-icons-png.flaticon.com/512/1077/1077063.png" alt="Age Icon"> Correo
-              Alternativo: {{ request.user.emailAlternative }}</li>
+          <li><span class="icon">✉️</span> <b>Correo Emergencia:</b> {{ emailEmergency }}</li>
+          {% if emailAlternative %}
+            <li><span class="icon">✉️</span> <b>Correo Alternativo:</b> {{ emailAlternative }}</li>
           {% endif %}
-          <li><img src="https://www.shutterstock.com/image-vector/location-pin-icon-simple-outline-260nw-672996514.jpg"
-                   alt="Pin Icon"> Ubicación: <a id="google-maps-link" href="#">[Ver en Google Maps]</a></li>
-          <li><img src="https://static.thenounproject.com/png/691206-200.png" alt="Clock Icon"> Fecha y
-            hora: {{ current_date }} - {{ current_time }}</li>
+          <li><span class="icon">📍</span> <b>Ubicación:</b> <a id="google-maps-link" href="#" target="_blank"
+                                                               rel="noopener noreferrer">[Obteniendo...]</a></li>
+          <li><span class="icon">🕒</span> <b>Fecha y hora:</b> {{ current_date }} - {{ current_time }}</li>
         </ul>
         <img src="https://upload.wikimedia.org/wikipedia/commons/3/3b/Eo_circle_green_checkmark.svg" alt="Check Icon"
-             class="check">
+             class="check-icon">
       </div>
     </div>
-    <a type="button" href="{% url 'auth_api:core:home' %}" class="cancel">CANCELAR</a>
+
+    <div id="countdown-display"></div>
+    <button type="button" class="cancel-btn" id="cancel-btn">CANCELAR <span class="speaker-icon">🔊</span></button>
   </div>
 
   <script>
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(function (position) {
-        const lat = position.coords.latitude;
-        const lng = position.coords.longitude;
-        document.getElementById('google-maps-link').href = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
-      }, function (error) {
-        console.error('Error al obtener la ubicación:', error);
-        document.getElementById('google-maps-link').textContent = '[Ubicación no disponible]';
-        document.getElementById('google-maps-link').removeAttribute('href');
-      });
-    } else {
-      document.getElementById('google-maps-link').textContent = '[Geolocalización no soportada]';
-      document.getElementById('google-maps-link').removeAttribute('href');
-    }
+    document.addEventListener('DOMContentLoaded', () => {
+      // --- Referencias a Elementos del DOM ---
+      const sendAlertBtn = document.getElementById('send-alert-btn');
+      const cancelBtn = document.getElementById('cancel-btn');
+      const countdownDisplay = document.getElementById('countdown-display');
+      const mapsLink = document.getElementById('google-maps-link');
+      const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
 
-    // Para el envío de alerta (implementar lógica real si es necesario)
-    document.getElementById('send-alert').addEventListener('click', function (e) {
-      e.preventDefault();
-      // Aquí iría la lógica para enviar la alerta, por ejemplo, una llamada AJAX a un endpoint de Django
-      alert('Alerta enviada (simulada). Implementa la lógica real aquí.');
+      // --- Estado de la Aplicación ---
+      let userLocation = {lat: null, lng: null};
+      let isAlertActive = false;
+      let countdownInterval = null;
+      let vibrationInterval = null;
+
+      // --- Funciones de Utilidad ---
+      const speak = (text, onEndCallback = () => {
+      }) => {
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
+          const utterance = new SpeechSynthesisUtterance(text);
+          utterance.lang = 'es-ES';
+          utterance.onend = onEndCallback;
+          window.speechSynthesis.speak(utterance);
+        }
+      };
+
+      const startVibration = () => {
+        if ('vibrate' in navigator) {
+          stopVibration(); // Asegurarse de que no haya vibraciones previas
+          vibrationInterval = setInterval(() => navigator.vibrate([500, 200]), 700); // Vibra 500ms, pausa 200ms
+        }
+      };
+
+      const stopVibration = () => {
+        if (vibrationInterval) clearInterval(vibrationInterval);
+        if ('vibrate' in navigator) navigator.vibrate(0); // Detiene cualquier vibración activa
+      };
+
+      // --- Lógica Principal ---
+
+      // 1. Obtener Geolocalización al cargar la página
+      const getGeolocation = () => {
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              userLocation.lat = position.coords.latitude;
+              userLocation.lng = position.coords.longitude;
+              mapsLink.href = `https://www.google.com/maps/search/?api=1&query=${userLocation.lat},${userLocation.lng}`;
+              mapsLink.textContent = '[Ver en Google Maps]';
+            },
+            (error) => {
+              console.error('Error de geolocalización:', error);
+              mapsLink.textContent = '[Ubicación no disponible]';
+              mapsLink.removeAttribute('href');
+              if (error.code === 1) { // Error de permisos
+                alert("Por favor, active los permisos de ubicación para usar la función de emergencia.");
+              }
+            }
+          );
+        } else {
+          mapsLink.textContent = '[Geolocalización no soportada]';
+          mapsLink.removeAttribute('href');
+        }
+      };
+
+      // 2. Función para enviar la alerta vía AJAX
+      const sendAlertAJAX = async () => {
+        if (!userLocation.lat) {
+          speak("No se pudo enviar la alerta porque la ubicación no está disponible.");
+          return;
+        }
+
+        try {
+          const response = await fetch("{% url 'auth_api:core:send_emergency_alert' %}", {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': csrfToken
+            },
+            body: JSON.stringify({
+              latitude: userLocation.lat,
+              longitude: userLocation.lng
+            })
+          });
+
+          if (response.ok) {
+            speak("Se envió la alerta, espere pronto su ayuda.");
+          } else {
+            throw new Error("El servidor devolvió un error.");
+          }
+        } catch (error) {
+          console.error("Error en la solicitud AJAX:", error);
+          speak("Error al enviar la alerta. Por favor, intente de nuevo.");
+        } finally {
+          isAlertActive = false; // Resetear el estado
+        }
+      };
+
+      // 3. Iniciar el proceso de alerta
+      const startAlertProcess = () => {
+        if (isAlertActive) return;
+        isAlertActive = true;
+
+        let countdown = 10;
+        countdownDisplay.textContent = `Enviando alerta en ${countdown}...`;
+        countdownDisplay.style.display = 'block';
+        cancelBtn.style.display = 'inline-block';
+        sendAlertBtn.classList.remove('pulsing'); // Detener pulso visual
+
+        startVibration();
+        speak(`Activando alerta de emergencia. La alerta se enviará en ${countdown} segundos. Presione cancelar para detener.`);
+
+        countdownInterval = setInterval(() => {
+          countdown--;
+          countdownDisplay.textContent = `Enviando alerta en ${countdown}...`;
+          if (countdown <= 0) {
+            clearInterval(countdownInterval);
+            stopVibration();
+            countdownDisplay.style.display = 'none';
+            cancelBtn.style.display = 'none';
+            sendAlertAJAX();
+          }
+        }, 1000);
+      };
+
+      // 4. Cancelar el proceso de alerta
+      const cancelAlertProcess = () => {
+        if (!isAlertActive) return;
+
+        clearInterval(countdownInterval);
+        stopVibration();
+        isAlertActive = false;
+
+        countdownDisplay.style.display = 'none';
+        cancelBtn.style.display = 'none';
+        sendAlertBtn.classList.add('pulsing'); // Reactivar pulso visual
+
+        speak("Se canceló el envío de alerta.");
+      };
+
+      // --- Asignación de Event Listeners ---
+      sendAlertBtn.addEventListener('click', startAlertProcess);
+      cancelBtn.addEventListener('click', cancelAlertProcess);
+      window.addEventListener('pagehide', () => { // Limpieza al salir de la página
+        stopVibration();
+        if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+      });
+
+      // --- Iniciar ---
+      getGeolocation();
     });
   </script>
 {% endblock %}
