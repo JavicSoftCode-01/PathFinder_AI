@@ -57,7 +57,6 @@ class RegisterView(CreateView):
       print(f"Longitud: {len(field_value)}")
       print(f"{'=' * 50}\n")
 
-      # Campos opcionales que pueden venir vacíos
       optional_fields = {'alternative_contact', 'emailAlternative'}
 
       if not field_value and field_name not in optional_fields:

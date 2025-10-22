@@ -9,12 +9,34 @@ from django.shortcuts import render
 from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
+from django.views.generic import TemplateView
 
 
 @method_decorator(csrf_exempt, name='dispatch')
 class TextReaderView(LoginRequiredMixin, View):
 
   def get(self, request, *args, **kwargs):
+    try:
+      api_key = settings.GEMINI_API_KEY
+      genai.configure(api_key=api_key)
+
+      print("\n" + "=" * 60)
+      print("MODELOS DISPONIBLES EN TU API:")
+      print("=" * 60)
+
+      models = genai.list_models()
+
+      for model in models:
+        if 'generateContent' in model.supported_generation_methods:
+          print(f"\n✓ Nombre: {model.name}")
+          print(f"  Display: {model.display_name}")
+          print(f"  Métodos: {model.supported_generation_methods}")
+
+      print("\n" + "=" * 60 + "\n")
+
+    except Exception as e:
+      print(f"ERROR listando modelos: {e}")
+
     return render(request, 'intelligent_assistant/text_reader.html')
 
   def post(self, request, *args, **kwargs):
@@ -45,7 +67,7 @@ class TextReaderView(LoginRequiredMixin, View):
         "No incluyas formatos como markdown."
       )
 
-      model = genai.GenerativeModel('gemini-2.5-pro')
+      model = genai.GenerativeModel('gemini-2.5-flash')
 
       response = model.generate_content([prompt_text, image_parts[0]])
 
@@ -57,3 +79,12 @@ class TextReaderView(LoginRequiredMixin, View):
     except Exception as e:
       print(f"Error en TextReaderView: {e}")
       return JsonResponse({'error': f'Ocurrió un error en el servidor: {str(e)}'}, status=500)
+
+
+class ObstacleDetectionView(LoginRequiredMixin, TemplateView):
+  template_name = 'intelligent_assistant/obstacle_detection.html'
+
+  def get_context_data(self, **kwargs):
+    context = super().get_context_data(**kwargs)
+    context['page_title'] = "Detección de Obstáculos"
+    return context

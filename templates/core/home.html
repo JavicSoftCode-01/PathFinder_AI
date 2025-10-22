@@ -162,7 +162,7 @@
   <h1>HOLA {{ user_name }}, BIENVENIDO AL ASISTENTE DE NAVEGACIÓN 👋</h1>
   <div class="cards-container">
     <div class="cards-row top-row">
-      <a href="/deteccion-obstaculos/" class="card">
+      <a href="{% url 'auth_api:intelligent_assistant:obstacle_detection' %}" class="card">
         <p>Detección de obstáculos</p>
         <img src="https://www.shutterstock.com/image-vector/blind-woman-holding-stick-mobile-600nw-1661441773.jpg"
              alt="Icono detección">

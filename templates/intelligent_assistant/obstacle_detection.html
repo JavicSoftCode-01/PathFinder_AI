@@ -1,0 +1,471 @@
+{% extends '../core/components/base.html' %}
+{% load static %}
+{% block content %}
+  <style>
+      :root {
+          --primary-bg: #3c1f76;
+          --indicator-bg: #2a1552;
+          --indicator-text: #ccc;
+          --indicator-active-bg: #a6d85b;
+          --indicator-blocked-bg: #e53e3e;
+          --indicator-active-text: #000;
+          --warning-box-bg: #e6c547;
+          --warning-box-text: #000;
+          --button-bg: #4caf50;
+          --button-repeat-bg: #4091ac;
+          --button-back-bg: #c94c4c;
+      }
+
+      .main-container {
+          max-width: 1200px;
+          margin: 20px auto;
+          padding: 20px;
+          color: white;
+      }
+
+      .header {
+          text-align: center;
+          margin-bottom: 20px;
+      }
+
+      .top-indicators {
+          display: flex;
+          justify-content: center;
+          margin-bottom: 10px;
+      }
+
+      .top-indicators div {
+          background-color: var(--indicator-bg);
+          color: var(--indicator-text);
+          padding: 8px 25px;
+          font-weight: bold;
+          transition: all 0.3s;
+      }
+
+      .top-indicators div.clear {
+          background-color: var(--indicator-active-bg);
+          color: var(--indicator-active-text);
+      }
+
+      .top-indicators div.blocked {
+          background-color: var(--indicator-blocked-bg);
+          color: white;
+      }
+
+      .top-indicators .left {
+          border-radius: 8px 0 0 8px;
+      }
+
+      .top-indicators .right {
+          border-radius: 0 8px 8px 0;
+      }
+
+      .main-title {
+          font-size: 2.5rem;
+          font-weight: bold;
+          text-transform: uppercase;
+      }
+
+      .detection-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 30px;
+      }
+
+      .left-column {
+          display: flex;
+          flex-direction: column;
+          gap: 20px;
+      }
+
+      .instruction-box {
+          background-color: var(--warning-box-bg);
+          color: var(--warning-box-text);
+          padding: 20px;
+          border-radius: 10px;
+          font-size: 1.5rem;
+          font-weight: bold;
+          min-height: 80px;
+          text-align: center;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+      }
+
+      .status-display {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 20px;
+          font-size: 1.2rem;
+      }
+
+      .status-display .user-icon {
+          font-size: 5rem;
+      }
+
+      .status-display .alerts .warning-icon {
+          color: var(--indicator-blocked-bg);
+          font-size: 3rem;
+          margin: 0 5px;
+          animation: blink 1.5s infinite;
+      }
+
+      @keyframes blink {
+          50% {
+              opacity: 0.3;
+          }
+      }
+
+      .status-indicator {
+          background: var(--indicator-bg);
+          padding: 10px 20px;
+          border-radius: 20px;
+      }
+
+      .controls {
+          display: flex;
+          flex-direction: column;
+          gap: 15px;
+      }
+
+      .btn-control {
+          border: none;
+          padding: 18px;
+          font-size: 1.1rem;
+          font-weight: bold;
+          border-radius: 10px;
+          cursor: pointer;
+          color: white;
+          text-decoration: none;
+          text-align: center;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+      }
+
+      .btn-training {
+          background-color: var(--button-bg);
+      }
+
+      .btn-repeat {
+          background-color: var(--button-repeat-bg);
+      }
+
+      .btn-back {
+          background-color: var(--button-back-bg);
+      }
+
+      .speaker-icon {
+          opacity: 0.8;
+      }
+
+      .right-column {
+          display: flex;
+          flex-direction: column;
+          gap: 20px;
+      }
+
+      .camera-view-container {
+          position: relative;
+          background-color: #000;
+          border: 4px solid #666;
+          border-radius: 10px;
+          overflow: hidden;
+          min-height: 400px;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+      }
+
+      #video-feed, #canvas {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+      }
+
+      #status-message {
+          font-size: 1.5rem;
+          font-weight: bold;
+          background: rgba(0, 0, 0, 0.6);
+          padding: 20px;
+          border-radius: 10px;
+          text-align: center;
+      }
+
+      .audio-control {
+          background: #333;
+          padding: 20px;
+          border-radius: 10px;
+          display: flex;
+          align-items: center;
+          gap: 15px;
+          font-size: 1.5rem;
+      }
+
+      .audio-control input[type="range"] {
+          flex-grow: 1;
+      }
+
+      @media (max-width: 900px) {
+          .detection-grid {
+              grid-template-columns: 1fr;
+          }
+
+          .main-title {
+              font-size: 2rem;
+          }
+
+          .left-column {
+              order: 2;
+          }
+
+          .right-column {
+              order: 1;
+          }
+      }
+  </style>
+
+  <div class="main-container">
+    <div class="header">
+      <div class="top-indicators">
+        <div class="left" id="indicator-left">Izquierda</div>
+        <div class="center" id="indicator-center">Centro</div>
+        <div class="right" id="indicator-right">Derecha</div>
+      </div>
+      <h1 class="main-title">Obstáculos Detectados <span class="speaker-icon">🔊</span></h1>
+    </div>
+    <div class="detection-grid">
+      <div class="left-column">
+        <div class="instruction-box" id="instruction-box">Active la cámara para iniciar la detección.</div>
+        <div class="status-display">
+          <div class="user-icon">👤</div>
+          <div class="alerts">
+            <span class="warning-icon" id="warning1" style="display:none;">⚠️</span>
+            <span class="warning-icon" id="warning2" style="display:none;">⚠️</span>
+          </div>
+        </div>
+        <div class="status-indicator" id="route-status"><span class="speaker-icon">🔊</span> INDICANDO RUTA.....</div>
+        <div class="controls">
+          <a href="#" class="btn-control btn-training">Modo entrenamiento <span class="speaker-icon">🔊</span></a>
+          <button class="btn-control btn-repeat" id="btn-repeat">Repetir instrucción <span class="speaker-icon">🔊</span>
+          </button>
+          <a href="{% url 'auth_api:core:home' %}" class="btn-control btn-back" id="btn-back">Volver al menú principal
+            <span class="speaker-icon">🔊</span></a>
+        </div>
+      </div>
+      <div class="right-column">
+        <div class="camera-view-container">
+          <video id="video-feed" autoplay playsinline muted></video>
+          <canvas id="canvas"></canvas>
+          <div id="status-message">CARGANDO MODELOS DE IA...</div>
+        </div>
+        <div class="audio-control">
+          <span>🔊</span>
+          <input type="range" min="0" max="1" step="0.1" value="1" id="volume-slider">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Claude + TensorFlow versión híbrida mejorada -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
+  <script src="https://js.puter.com/v2/"></script>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      const video = document.getElementById('video-feed');
+      const canvas = document.getElementById('canvas');
+      const ctx = canvas.getContext('2d');
+      const instructionBox = document.getElementById('instruction-box');
+      const statusMessage = document.getElementById('status-message');
+      const btnRepeat = document.getElementById('btn-repeat');
+      const volumeSlider = document.getElementById('volume-slider');
+      const indicators = {
+        left: document.getElementById('indicator-left'),
+        center: document.getElementById('indicator-center'),
+        right: document.getElementById('indicator-right')
+      };
+
+      let cocoSsdModel = null;
+      let poseDetector = null;
+      let detectionInterval = null;
+      let isCameraOn = false;
+      let isSpeaking = false;
+      let lastInstruction = "Sin instrucciones aún.";
+
+      const synth = window.speechSynthesis;
+      const speak = (text) => {
+        if (isSpeaking) return; // Evitar superposición
+        isSpeaking = true;
+        synth.cancel();
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = 'es-ES';
+        u.volume = parseFloat(volumeSlider.value);
+        u.rate = 1.0;
+        u.onend = () => {
+          isSpeaking = false;
+        };
+        synth.speak(u);
+        lastInstruction = text;
+      };
+      const vibrate = (ms) => {
+        if ('vibrate' in navigator) navigator.vibrate(ms);
+      };
+
+      // ✨ Claude analiza el contexto para mejorar la instrucción
+      async function getClaudeNavigationAdvice(sceneSummary) {
+        try {
+          const prompt = `
+Eres un asistente de movilidad para una persona no vidente.
+Analiza esta descripción visual y da una sola instrucción clara y útil.
+Habla en español, tono tranquilo, breve y preciso.
+Evita repetir o contradecirte.
+
+Escenario visual:
+${sceneSummary}
+
+Responde con una sola instrucción directa, por ejemplo:
+- "Camino libre al frente."
+- "Gire levemente a la izquierda, hay una persona delante."
+- "Peligro: obstáculo grande, deténgase y espere."
+`;
+
+          const response = await puter.ai.chat(prompt, {
+            model: 'claude-sonnet-4-5',
+          });
+
+          return response?.message?.content?.[0]?.text?.trim() || "Analizando entorno...";
+        } catch (err) {
+          console.error("Error Claude:", err);
+          return "Analizando entorno...";
+        }
+      }
+
+      // 🔍 Detección local
+      async function detectFrame() {
+        if (!isCameraOn || !cocoSsdModel) return;
+
+        const objects = await cocoSsdModel.detect(video);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        const width = video.videoWidth;
+        const height = video.videoHeight;
+        const zoneWidth = width / 3;
+
+        let zones = {left: false, center: false, right: false};
+        let summary = [];
+
+        for (const obj of objects) {
+          const [x, y, w, h] = obj.bbox;
+          const cx = x + w / 2;
+          ctx.strokeStyle = "#00FF00";
+          ctx.lineWidth = 2;
+          ctx.strokeRect(x, y, w, h);
+          ctx.fillStyle = "#fff";
+          ctx.fillText(obj.class, x, y > 10 ? y - 5 : 10);
+
+          if (cx < zoneWidth) zones.left = true;
+          else if (cx > 2 * zoneWidth) zones.right = true;
+          else zones.center = true;
+
+          summary.push(`${obj.class}`);
+        }
+
+        // Indicadores visuales
+        indicators.left.className = zones.left ? "left blocked" : "left clear";
+        indicators.center.className = zones.center ? "center blocked" : "center clear";
+        indicators.right.className = zones.right ? "right blocked" : "right clear";
+
+        // Crear descripción resumida
+        const sceneSummary = `
+Objetos detectados: ${summary.join(", ") || "ninguno"}.
+Zonas bloqueadas: ${
+          [zones.left && "izquierda", zones.center && "centro", zones.right && "derecha"]
+            .filter(Boolean)
+            .join(", ") || "ninguna"
+        }.
+`;
+
+        // Generar instrucción optimizada con Claude
+        const claudeInstruction = await getClaudeNavigationAdvice(sceneSummary);
+
+        if (claudeInstruction !== lastInstruction && !isSpeaking) {
+          instructionBox.textContent = claudeInstruction;
+          speak(claudeInstruction);
+
+          if (claudeInstruction.includes("peligro") || claudeInstruction.includes("deténgase"))
+            vibrate(800);
+        }
+      }
+
+      async function startCamera() {
+        statusMessage.textContent = "Iniciando cámara...";
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({video: {facingMode: 'environment'}});
+          video.srcObject = stream;
+          await new Promise(r => video.onloadedmetadata = r);
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          statusMessage.style.display = "none";
+          isCameraOn = true;
+          speak("Cámara activada. Iniciando guía inteligente.");
+          detectionInterval = setInterval(detectFrame, 1500); // Procesar cada 1.5s para estabilidad
+        } catch (e) {
+          console.error(e);
+          speak("No se pudo acceder a la cámara.");
+          statusMessage.textContent = "Error de cámara.";
+        }
+      }
+
+      async function init() {
+        try {
+          [cocoSsdModel, poseDetector] = await Promise.all([
+            cocoSsd.load(),
+            poseDetection.createDetector(
+              poseDetection.SupportedModels.BlazePose,
+              {runtime: 'tfjs', modelType: 'lite'}
+            )
+          ]);
+          statusMessage.textContent = "Modelos cargados.";
+          speak("Bienvenido. Diga 'enciende cámara' para comenzar.");
+        } catch (err) {
+          console.error(err);
+          speak("Error cargando modelos de inteligencia artificial.");
+        }
+      }
+
+      btnRepeat.addEventListener('click', () => speak(lastInstruction));
+      window.addEventListener('beforeunload', () => {
+        if (detectionInterval) clearInterval(detectionInterval);
+        if (video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
+        synth.cancel();
+      });
+
+      // 🎙️ Activar voz: "enciende cámara"
+      const rec = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+      rec.lang = 'es-ES';
+      rec.continuous = true;
+      rec.onresult = (e) => {
+        const txt = e.results[e.results.length - 1][0].transcript.toLowerCase();
+        if (txt.includes("enciende cámara")) startCamera();
+        if (txt.includes("apaga cámara")) {
+          clearInterval(detectionInterval);
+          if (video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
+          isCameraOn = false;
+          speak("Cámara apagada.");
+        }
+      };
+      rec.start();
+
+      await init();
+    });
+  </script>
+
+{% endblock %}
