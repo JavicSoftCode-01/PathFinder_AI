@@ -1,6 +1,7 @@
 {% extends '../core/components/base.html' %}
 {% load static %}
 {% block content %}
+
   <style>
       :root {
           --primary-bg: #3c1f76;
@@ -14,6 +15,10 @@
           --button-bg: #4caf50;
           --button-repeat-bg: #4091ac;
           --button-back-bg: #c94c4c;
+      }
+
+      * {
+          box-sizing: border-box;
       }
 
       .main-container {
@@ -123,6 +128,29 @@
           border-radius: 20px;
       }
 
+      .mic-status {
+          background: #333;
+          padding: 10px 20px;
+          border-radius: 20px;
+          text-align: center;
+          display: none;
+      }
+
+      .mic-status.listening {
+          display: block;
+          background: #4caf50;
+          animation: pulse 1s infinite;
+      }
+
+      @keyframes pulse {
+          0%, 100% {
+              opacity: 1;
+          }
+          50% {
+              opacity: 0.6;
+          }
+      }
+
       .controls {
           display: flex;
           flex-direction: column;
@@ -143,6 +171,12 @@
           align-items: center;
           justify-content: center;
           gap: 8px;
+          transition: opacity 0.3s;
+      }
+
+      .btn-control:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
       }
 
       .btn-training {
@@ -179,22 +213,36 @@
           align-items: center;
       }
 
-      #video-feed, #canvas {
-          position: absolute;
-          top: 0;
-          left: 0;
+      #video-feed {
           width: 100%;
           height: 100%;
           object-fit: cover;
+          display: none;
+      }
+
+      #video-feed.active {
+          display: block;
       }
 
       #status-message {
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          display: flex;
+          justify-content: center;
+          align-items: center;
           font-size: 1.5rem;
           font-weight: bold;
-          background: rgba(0, 0, 0, 0.6);
+          background: rgba(0, 0, 0, 0.9);
           padding: 20px;
-          border-radius: 10px;
           text-align: center;
+          z-index: 10;
+      }
+
+      #status-message.hidden {
+          display: none;
       }
 
       .audio-control {
@@ -227,6 +275,15 @@
           .right-column {
               order: 1;
           }
+
+          .camera-view-container {
+              min-height: 300px;
+          }
+
+          #status-message {
+              font-size: 1.2rem;
+              padding: 15px;
+          }
       }
   </style>
 
@@ -237,32 +294,31 @@
         <div class="center" id="indicator-center">Centro</div>
         <div class="right" id="indicator-right">Derecha</div>
       </div>
-      <h1 class="main-title">Obstáculos Detectados <span class="speaker-icon">🔊</span></h1>
+      <h1 class="main-title">Guía Inteligente <span class="speaker-icon">🔊</span></h1>
     </div>
     <div class="detection-grid">
       <div class="left-column">
-        <div class="instruction-box" id="instruction-box">Active la cámara para iniciar la detección.</div>
+        <div class="instruction-box" id="instruction-box">Active la cámara para iniciar la guía.</div>
         <div class="status-display">
           <div class="user-icon">👤</div>
           <div class="alerts">
             <span class="warning-icon" id="warning1" style="display:none;">⚠️</span>
-            <span class="warning-icon" id="warning2" style="display:none;">⚠️</span>
           </div>
         </div>
-        <div class="status-indicator" id="route-status"><span class="speaker-icon">🔊</span> INDICANDO RUTA.....</div>
+        <div class="status-indicator" id="route-status">ESTADO: <span id="connection-status">DESCONECTADO</span></div>
+        <div class="mic-status" id="mic-status">🎤 Escuchando comando de voz...</div>
         <div class="controls">
-          <a href="#" class="btn-control btn-training">Modo entrenamiento <span class="speaker-icon">🔊</span></a>
+          <button class="btn-control btn-training" id="btn-start">Iniciar Guía <span class="speaker-icon">🔊</span>
+          </button>
           <button class="btn-control btn-repeat" id="btn-repeat">Repetir instrucción <span class="speaker-icon">🔊</span>
           </button>
-          <a href="{% url 'auth_api:core:home' %}" class="btn-control btn-back" id="btn-back">Volver al menú principal
-            <span class="speaker-icon">🔊</span></a>
+          <a href="{% url 'auth_api:core:home' %}" class="btn-control btn-back" id="btn-back">Volver al menú</a>
         </div>
       </div>
       <div class="right-column">
         <div class="camera-view-container">
           <video id="video-feed" autoplay playsinline muted></video>
-          <canvas id="canvas"></canvas>
-          <div id="status-message">CARGANDO MODELOS DE IA...</div>
+          <div id="status-message">Esperando activación de cámara...</div>
         </div>
         <div class="audio-control">
           <span>🔊</span>
@@ -272,151 +328,181 @@
     </div>
   </div>
 
-  <!-- Claude + TensorFlow versión híbrida mejorada -->
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
-  <script src="https://js.puter.com/v2/"></script>
-
   <script>
-    document.addEventListener('DOMContentLoaded', async () => {
+    document.addEventListener('DOMContentLoaded', () => {
       const video = document.getElementById('video-feed');
-      const canvas = document.getElementById('canvas');
-      const ctx = canvas.getContext('2d');
       const instructionBox = document.getElementById('instruction-box');
       const statusMessage = document.getElementById('status-message');
+      const connectionStatus = document.getElementById('connection-status');
+      const btnStart = document.getElementById('btn-start');
       const btnRepeat = document.getElementById('btn-repeat');
       const volumeSlider = document.getElementById('volume-slider');
+      const micStatus = document.getElementById('mic-status');
       const indicators = {
         left: document.getElementById('indicator-left'),
         center: document.getElementById('indicator-center'),
         right: document.getElementById('indicator-right')
       };
 
-      let cocoSsdModel = null;
-      let poseDetector = null;
-      let detectionInterval = null;
+      let processingInterval = null;
       let isCameraOn = false;
       let isSpeaking = false;
       let lastInstruction = "Sin instrucciones aún.";
+      let socket = null;
+      let recognition = null;
+      let isListening = false;
 
       const synth = window.speechSynthesis;
-      const speak = (text) => {
-        if (isSpeaking) return; // Evitar superposición
+
+      const speak = (text, onEndCallback = null) => {
+        if (isSpeaking || !text) return;
         isSpeaking = true;
         synth.cancel();
         const u = new SpeechSynthesisUtterance(text);
         u.lang = 'es-ES';
         u.volume = parseFloat(volumeSlider.value);
-        u.rate = 1.0;
+        u.rate = 1.1;
         u.onend = () => {
           isSpeaking = false;
+          // Ejecutar callback después de terminar de hablar
+          if (onEndCallback && typeof onEndCallback === 'function') {
+            onEndCallback();
+          }
         };
         synth.speak(u);
         lastInstruction = text;
       };
-      const vibrate = (ms) => {
-        if ('vibrate' in navigator) navigator.vibrate(ms);
-      };
 
-      // ✨ Claude analiza el contexto para mejorar la instrucción
-      async function getClaudeNavigationAdvice(sceneSummary) {
-        try {
-          const prompt = `
-Eres un asistente de movilidad para una persona no vidente.
-Analiza esta descripción visual y da una sola instrucción clara y útil.
-Habla en español, tono tranquilo, breve y preciso.
-Evita repetir o contradecirte.
+      // Inicializar reconocimiento de voz
+      function initVoiceRecognition() {
+        if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+          console.log('Reconocimiento de voz no soportado');
+          return;
+        }
 
-Escenario visual:
-${sceneSummary}
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        recognition = new SpeechRecognition();
+        recognition.lang = 'es-ES';
+        recognition.continuous = false;
+        recognition.interimResults = false;
 
-Responde con una sola instrucción directa, por ejemplo:
-- "Camino libre al frente."
-- "Gire levemente a la izquierda, hay una persona delante."
-- "Peligro: obstáculo grande, deténgase y espere."
-`;
+        recognition.onstart = () => {
+          isListening = true;
+          micStatus.classList.add('listening');
+          console.log('Escuchando comando...');
+        };
 
-          const response = await puter.ai.chat(prompt, {
-            model: 'claude-sonnet-4-5',
-          });
+        recognition.onresult = (event) => {
+          const transcript = event.results[0][0].transcript.toLowerCase();
+          console.log('Comando escuchado:', transcript);
 
-          return response?.message?.content?.[0]?.text?.trim() || "Analizando entorno...";
-        } catch (err) {
-          console.error("Error Claude:", err);
-          return "Analizando entorno...";
+          if (transcript.includes('cámara') && (transcript.includes('activa') || transcript.includes('activar') || transcript.includes('active'))) {
+            speak('Activando cámara');
+            setTimeout(() => startCamera(), 500);
+          }
+        };
+
+        recognition.onerror = (event) => {
+          console.error('Error de reconocimiento:', event.error);
+          isListening = false;
+          micStatus.classList.remove('listening');
+        };
+
+        recognition.onend = () => {
+          isListening = false;
+          micStatus.classList.remove('listening');
+          console.log('Reconocimiento finalizado');
+        };
+      }
+
+      function startListening() {
+        if (recognition && !isListening && !isCameraOn) {
+          try {
+            recognition.start();
+            // Detener automáticamente después de 7 segundos
+            setTimeout(() => {
+              if (isListening) {
+                recognition.stop();
+              }
+            }, 7000);
+          } catch (e) {
+            console.error('Error al iniciar reconocimiento:', e);
+          }
         }
       }
 
-      // 🔍 Detección local
-      async function detectFrame() {
-        if (!isCameraOn || !cocoSsdModel) return;
+      function connectWebSocket() {
+        const wsScheme = window.location.protocol === "https:" ? "wss" : "ws";
+        socket = new WebSocket(`${wsScheme}://${window.location.host}/ws/obstacle_detection/`);
 
-        const objects = await cocoSsdModel.detect(video);
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        socket.onopen = () => {
+          console.log("WebSocket conectado.");
+          connectionStatus.textContent = "CONECTADO";
+          statusMessage.classList.add('hidden');
+          video.classList.add('active');
+          speak("Guía inteligente conectada. Iniciando detección.");
+          processingInterval = setInterval(sendFrame, 500);
+        };
 
-        const width = video.videoWidth;
-        const height = video.videoHeight;
-        const zoneWidth = width / 3;
+        socket.onmessage = (event) => {
+          const data = JSON.parse(event.data);
 
-        let zones = {left: false, center: false, right: false};
-        let summary = [];
+          // Actualizar indicadores visuales SIEMPRE
+          indicators.left.className = data.zones.left ? "left blocked" : "left clear";
+          indicators.center.className = data.zones.center ? "center blocked" : "center clear";
+          indicators.right.className = data.zones.right ? "right blocked" : "right clear";
 
-        for (const obj of objects) {
-          const [x, y, w, h] = obj.bbox;
-          const cx = x + w / 2;
-          ctx.strokeStyle = "#00FF00";
-          ctx.lineWidth = 2;
-          ctx.strokeRect(x, y, w, h);
-          ctx.fillStyle = "#fff";
-          ctx.fillText(obj.class, x, y > 10 ? y - 5 : 10);
+          // Solo hablar si no está en modo silencioso y la instrucción es nueva
+          if (data.instruction && !data.silent) {
+            if (data.instruction !== lastInstruction || data.from_gemini) {
+              instructionBox.textContent = data.instruction;
+              if (!isSpeaking) {
+                speak(data.instruction);
+              }
+            }
+          }
+        };
 
-          if (cx < zoneWidth) zones.left = true;
-          else if (cx > 2 * zoneWidth) zones.right = true;
-          else zones.center = true;
+        socket.onclose = () => {
+          console.log("WebSocket desconectado. Intentando reconectar...");
+          connectionStatus.textContent = "RECONECTANDO...";
+          clearInterval(processingInterval);
+          setTimeout(connectWebSocket, 3000);
+        };
 
-          summary.push(`${obj.class}`);
-        }
+        socket.onerror = (err) => {
+          console.error("Error de WebSocket:", err);
+          connectionStatus.textContent = "ERROR";
+          socket.close();
+        };
+      }
 
-        // Indicadores visuales
-        indicators.left.className = zones.left ? "left blocked" : "left clear";
-        indicators.center.className = zones.center ? "center blocked" : "center clear";
-        indicators.right.className = zones.right ? "right blocked" : "right clear";
+      function sendFrame() {
+        if (!isCameraOn || socket.readyState !== WebSocket.OPEN) return;
 
-        // Crear descripción resumida
-        const sceneSummary = `
-Objetos detectados: ${summary.join(", ") || "ninguno"}.
-Zonas bloqueadas: ${
-          [zones.left && "izquierda", zones.center && "centro", zones.right && "derecha"]
-            .filter(Boolean)
-            .join(", ") || "ninguna"
-        }.
-`;
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-        // Generar instrucción optimizada con Claude
-        const claudeInstruction = await getClaudeNavigationAdvice(sceneSummary);
-
-        if (claudeInstruction !== lastInstruction && !isSpeaking) {
-          instructionBox.textContent = claudeInstruction;
-          speak(claudeInstruction);
-
-          if (claudeInstruction.includes("peligro") || claudeInstruction.includes("deténgase"))
-            vibrate(800);
-        }
+        const imageData = canvas.toDataURL('image/jpeg', 0.5);
+        socket.send(JSON.stringify({'image': imageData}));
       }
 
       async function startCamera() {
+        if (isCameraOn) return;
         statusMessage.textContent = "Iniciando cámara...";
+        statusMessage.classList.remove('hidden');
         try {
           const stream = await navigator.mediaDevices.getUserMedia({video: {facingMode: 'environment'}});
           video.srcObject = stream;
           await new Promise(r => video.onloadedmetadata = r);
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
-          statusMessage.style.display = "none";
+          statusMessage.textContent = "Conectando con el servidor...";
           isCameraOn = true;
-          speak("Cámara activada. Iniciando guía inteligente.");
-          detectionInterval = setInterval(detectFrame, 1500); // Procesar cada 1.5s para estabilidad
+          btnStart.textContent = "Guía Activa ✓";
+          btnStart.disabled = true;
+          connectWebSocket();
         } catch (e) {
           console.error(e);
           speak("No se pudo acceder a la cámara.");
@@ -424,47 +510,30 @@ Zonas bloqueadas: ${
         }
       }
 
-      async function init() {
-        try {
-          [cocoSsdModel, poseDetector] = await Promise.all([
-            cocoSsd.load(),
-            poseDetection.createDetector(
-              poseDetection.SupportedModels.BlazePose,
-              {runtime: 'tfjs', modelType: 'lite'}
-            )
-          ]);
-          statusMessage.textContent = "Modelos cargados.";
-          speak("Bienvenido. Diga 'enciende cámara' para comenzar.");
-        } catch (err) {
-          console.error(err);
-          speak("Error cargando modelos de inteligencia artificial.");
-        }
-      }
-
+      btnStart.addEventListener('click', startCamera);
       btnRepeat.addEventListener('click', () => speak(lastInstruction));
+
       window.addEventListener('beforeunload', () => {
-        if (detectionInterval) clearInterval(detectionInterval);
+        if (processingInterval) clearInterval(processingInterval);
         if (video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
+        if (socket) socket.close();
+        if (recognition) recognition.abort();
         synth.cancel();
       });
 
-      // 🎙️ Activar voz: "enciende cámara"
-      const rec = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-      rec.lang = 'es-ES';
-      rec.continuous = true;
-      rec.onresult = (e) => {
-        const txt = e.results[e.results.length - 1][0].transcript.toLowerCase();
-        if (txt.includes("enciende cámara")) startCamera();
-        if (txt.includes("apaga cámara")) {
-          clearInterval(detectionInterval);
-          if (video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
-          isCameraOn = false;
-          speak("Cámara apagada.");
-        }
-      };
-      rec.start();
+      // Inicialización al cargar la página - CORREGIDO
+      setTimeout(() => {
+        initVoiceRecognition(); // Primero inicializa el reconocimiento
 
-      await init();
+        // Habla y cuando termine, activa el micrófono
+        speak("Bienvenido a Guía Inteligente. Puede presionar el botón para iniciar, o decir: cámara activa, para activar por voz.", () => {
+          // Este callback se ejecuta DESPUÉS de que termine de hablar
+          console.log('Voz terminó, iniciando escucha...');
+          setTimeout(() => {
+            startListening();
+          }, 500); // Pequeña pausa de 500ms después de que termine de hablar
+        });
+      }, 500);
     });
   </script>
 

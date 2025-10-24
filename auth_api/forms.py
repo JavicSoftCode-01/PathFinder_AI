@@ -16,7 +16,6 @@ class CustomUserCreationForm(UserCreationForm):
     label="Correo Electrónico/Usuario",
     widget=forms.EmailInput(attrs={'placeholder': 'Correo Electrónico/Usuario'}),
   )
-
   emailEmergency = forms.EmailField(
     label="Correo Electrónico de Emergencia",
     widget=forms.EmailInput(attrs={'placeholder': 'Correo Electrónico de Emergencia'}),
@@ -26,7 +25,6 @@ class CustomUserCreationForm(UserCreationForm):
     required=False,
     widget=forms.EmailInput(attrs={'placeholder': 'Correo Electrónico Alternativo'}),
   )
-
   emergency_contact = forms.CharField(
     max_length=10,
     label="Contacto de emergencia",

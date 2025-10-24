@@ -188,14 +188,14 @@
       const synthesis = window.speechSynthesis;
       let isCameraOn = false;
       let isProcessing = false;
-      let lastSpokenText = "";
-      let stream; // Variable para mantener la referencia al stream de la cámara
+      let lastApiResultText = ""; // NUEVO: Variable dedicada solo para el texto de la API.
+      let stream;
 
       // --- Funciones principales ---
 
       /**
        * Función centralizada para hablar texto.
-       * Cancela cualquier discurso anterior y maneja los estados de los botones.
+       * Cancela cualquier discurso ANTERIOR y maneja los estados de los botones.
        * @param {string} text - El texto a leer en voz alta.
        * @param {function} onEndCallback - Función a ejecutar cuando el discurso termine.
        */
@@ -205,8 +205,11 @@
           onEndCallback();
           return;
         }
-        // Asegurarse de cancelar cualquier discurso pendiente
-        if (synthesis.speaking) synthesis.cancel();
+
+        // Si ya está hablando, cancela el enunciado anterior para dar paso al nuevo.
+        if (synthesis.speaking) {
+          synthesis.cancel();
+        }
 
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'es-ES';
@@ -224,14 +227,12 @@
           onEndCallback();
         };
 
-        // Manejar el caso en que la síntesis de voz falle o sea interrumpida
         utterance.onerror = (event) => {
           console.error("Error en la síntesis de voz:", event);
-          onEndCallback(); // Asegurarse de que el flujo continúe
+          btnPause.disabled = true; // Deshabilitar si hay un error
+          onEndCallback();
         };
 
-        lastSpokenText = text;
-        btnRepeat.disabled = false;
         synthesis.speak(utterance);
       }
 
@@ -239,7 +240,7 @@
        * Inicia la cámara y actualiza la UI.
        */
       async function startCamera() {
-        mainButton.disabled = true; // Deshabilitar mientras se activa
+        mainButton.disabled = true;
         statusText.textContent = 'Iniciando cámara...';
         try {
           stream = await navigator.mediaDevices.getUserMedia({video: {facingMode: 'environment'}});
@@ -260,7 +261,7 @@
       }
 
       /**
-       * Detiene las pistas de la cámara y cancela cualquier discurso.
+       * Detiene las pistas de la cámara, cancela el habla y limpia el estado.
        */
       function stopCameraAndSpeech() {
         if (synthesis.speaking) synthesis.cancel();
@@ -269,13 +270,14 @@
         }
         video.srcObject = null;
         isCameraOn = false;
+        isProcessing = false;
+        lastApiResultText = ""; // MODIFICADO: Limpia el texto guardado al salir.
         mainButton.textContent = '▷ Activar cámara';
         mainButton.disabled = false;
         statusText.textContent = 'Cámara inactiva';
         btnPause.disabled = true;
         btnRepeat.disabled = true;
         loader.style.display = 'none';
-        isProcessing = false;
       }
 
       /**
@@ -285,12 +287,16 @@
         if (!isCameraOn || isProcessing || video.readyState < 2) return;
 
         isProcessing = true;
-        mainButton.disabled = true; // <--- Bloquea el botón al iniciar
+        mainButton.disabled = true;
         loader.style.display = 'block';
         statusText.textContent = 'Analizando imagen con la IA...';
         detectedText.textContent = "Texto detectado: ...";
+
+        // MODIFICADO: Limpiamos el resultado anterior y deshabilitamos 'Repetir' al iniciar una nueva captura.
+        lastApiResultText = "";
         btnPause.disabled = true;
         btnRepeat.disabled = true;
+        if (synthesis.speaking) synthesis.cancel(); // Detiene cualquier habla anterior.
 
         const canvas = document.createElement('canvas');
         canvas.width = video.videoWidth;
@@ -305,7 +311,7 @@
             body: JSON.stringify({image_data: imageData}),
           });
 
-          loader.style.display = 'none'; // <--- Oculta el loader en cuanto llega la respuesta
+          loader.style.display = 'none';
 
           if (!response.ok) {
             const errorData = await response.json();
@@ -314,14 +320,19 @@
 
           const result = await response.json();
           const newText = result.text || "No se detectó texto o contenido.";
-          detectedText.textContent = `Resultado: "${newText}"`;
 
-          // Inicia la secuencia de voz: primero el resultado, luego el mensaje final
+          // MODIFICADO: Guardamos el resultado de la API en su variable dedicada.
+          lastApiResultText = newText;
+          detectedText.textContent = `Resultado: "${newText}"`;
+          btnRepeat.disabled = false; // Habilitamos 'Repetir' ahora que tenemos texto.
+
+          // Inicia la secuencia de voz
           speak(newText, () => {
+            // Cuando termine de leer el resultado, damos la siguiente instrucción.
             speak("Vuelva a capturar otro texto si lo desea.", () => {
-              // Este es el final de todo el proceso.
+              // Al final de todo el proceso, reactivamos el botón principal.
               isProcessing = false;
-              mainButton.disabled = false; // <--- Reactiva el botón
+              mainButton.disabled = false;
             });
           });
 
@@ -330,7 +341,8 @@
           const errorMessage = `Ocurrió un error: ${error.message}`;
           statusText.textContent = errorMessage;
           loader.style.display = 'none';
-          // Hablar el error y luego reactivar el botón
+          detectedText.textContent = "Texto detectado: ...";
+
           speak(errorMessage, () => {
             isProcessing = false;
             mainButton.disabled = false;
@@ -347,9 +359,11 @@
       btnPause.addEventListener('click', () => {
         if (synthesis.speaking) {
           if (synthesis.paused) {
+            // Si está pausado, reanúdalo.
             synthesis.resume();
             btnPause.textContent = '❚❚ Pausar';
           } else {
+            // Si está hablando, páusalo.
             synthesis.pause();
             btnPause.textContent = '▶ Reanudar';
           }
@@ -357,12 +371,14 @@
       });
 
       btnRepeat.addEventListener('click', () => {
-        // Usa una función speak sin callback para no interferir con el estado
-        if (lastSpokenText) speak(lastSpokenText);
+        // MODIFICADO: Usa la variable dedicada para repetir el texto correcto.
+        // Esto no interfiere con el estado de pausa/reanudación, simplemente inicia una nueva lectura del texto guardado.
+        if (lastApiResultText) {
+          speak(lastApiResultText);
+        }
       });
 
       // El evento 'pagehide' es más fiable que 'beforeunload' en móviles.
-      // Se dispara cuando el usuario navega fuera de la página.
       window.addEventListener('pagehide', stopCameraAndSpeech);
 
       // Mensaje de bienvenida inicial
