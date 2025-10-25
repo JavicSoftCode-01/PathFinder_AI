@@ -10,7 +10,7 @@ from django.conf import settings
 from ultralytics import YOLO
 
 try:
-  yolo_model = YOLO('yolov8n.pt')
+  yolo_model = YOLO('intelligent_assistant/IA_models/yolov8m-seg.pt')
 
   import google.generativeai as genai
 
@@ -29,7 +29,7 @@ class ObstacleConsumer(WebsocketConsumer):
   def connect(self):
     self.accept()
     self.last_gemini_call_time = 0
-    self.gemini_call_interval = 15
+    self.gemini_call_interval = 7
     self.is_gemini_processing = False
     self.last_instruction_sent = ""
     self.last_yolo_instruction = ""
