@@ -27,6 +27,7 @@
           max-width: 900px;
           margin: 0 auto;
           text-align: center;
+          margin-top: -30px;
       }
 
       .reader-title {
@@ -172,212 +173,248 @@
     </div>
   </div>
 
-  <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      const video = document.getElementById('video-feed');
-      const statusText = document.getElementById('status-text');
-      const detectedText = document.getElementById('detected-text');
-      const mainButton = document.getElementById('main-button');
-      const btnPause = document.getElementById('btn-pause');
-      const btnRepeat = document.getElementById('btn-repeat');
-      const loader = document.getElementById('loader');
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const video = document.getElementById('video-feed');
+    const statusText = document.getElementById('status-text');
+    const detectedText = document.getElementById('detected-text');
+    const mainButton = document.getElementById('main-button');
+    const btnPause = document.getElementById('btn-pause');
+    const btnRepeat = document.getElementById('btn-repeat');
+    const loader = document.getElementById('loader');
 
-      const synthesis = window.speechSynthesis;
-      let isCameraOn = false;
-      let isProcessing = false;
-      let stream;
-      let lastApiResultText = "";
-      let speechQueue = [];
-      let currentIndex = 0;
-      let isPausedManually = false;
+    const synthesis = window.speechSynthesis;
+    let isCameraOn = false;
+    let isProcessing = false;
+    let stream;
+    let lastApiResultText = "";
+    let speechChunks = [];
+    let currentChunkIndex = 0;
+    let isPausedManually = false;
+    let isSpeaking = false;
 
-      // --- FUNCIONES DE VOZ ---
-      function splitText(text) {
-        return text.split(/(?<=[.!?])\s+/); // Divide en oraciones
+    // --- UTILS ---
+    function splitIntoChunks(text) {
+      // Divide en fragmentos de máximo 3 palabras
+      const words = text.trim().split(/\s+/);
+      const chunks = [];
+      for (let i = 0; i < words.length; i += 3) {
+        chunks.push(words.slice(i, i + 3).join(' '));
       }
+      return chunks;
+    }
 
-      function speakFrom(index = 0, onEndCallback = () => {
-      }) {
-        if (index >= speechQueue.length) {
-          btnPause.disabled = true;
-          statusText.textContent = isCameraOn ? 'Cámara activa. Listo para capturar.' : 'Cámara inactiva.';
-          onEndCallback();
-          return;
-        }
-
-        const utterance = new SpeechSynthesisUtterance(speechQueue[index]);
-        utterance.lang = 'es-ES';
-        utterance.rate = 1;
-
-        utterance.onstart = () => {
-          statusText.textContent = 'Leyendo...';
-          btnPause.disabled = false;
-          btnPause.textContent = '❚❚ Pausar';
-        };
-
-        utterance.onend = () => {
-          if (!isPausedManually) {
-            currentIndex = index + 1;
-            if (currentIndex < speechQueue.length) {
-              speakFrom(currentIndex, onEndCallback);
-            } else {
-              btnPause.disabled = true;
-              btnRepeat.disabled = false;
-              statusText.textContent = 'Lectura finalizada.';
-              onEndCallback();
-            }
-          }
-        };
-
-        utterance.onerror = (e) => console.error("Error TTS:", e);
-        synthesis.speak(utterance);
-      }
-
-      function startSpeaking(text, onEndCallback = () => {
-      }) {
-        if (synthesis.speaking) synthesis.cancel();
-        speechQueue = splitText(text);
-        currentIndex = 0;
-        isPausedManually = false;
-        speakFrom(0, onEndCallback);
-      }
-
-      function pauseSpeaking() {
-        if (synthesis.speaking) {
-          synthesis.cancel(); // Detenemos TTS (no pausa real)
-          isPausedManually = true;
-          statusText.textContent = 'Lectura en pausa...';
-          btnPause.textContent = '▶ Reanudar';
-        }
-      }
-
-      function resumeSpeaking() {
-        if (isPausedManually && currentIndex < speechQueue.length) {
-          isPausedManually = false;
-          statusText.textContent = 'Reanudando lectura...';
-          btnPause.textContent = '❚❚ Pausar';
-          speakFrom(currentIndex);
-        }
-      }
-
-      // --- CÁMARA ---
-      async function startCamera() {
-        mainButton.disabled = true;
-        statusText.textContent = 'Iniciando cámara...';
-        try {
-          stream = await navigator.mediaDevices.getUserMedia({video: {facingMode: 'environment'}});
-          video.srcObject = stream;
-          await video.play();
-          isCameraOn = true;
-          mainButton.textContent = '📸 Capturar texto';
-          mainButton.disabled = false;
-          statusText.textContent = 'Cámara activa. Apunte y presione "Capturar texto".';
-          startSpeaking("Cámara activada. Apunte y presione el botón para capturar el texto.");
-        } catch (err) {
-          console.error("Error al acceder a la cámara:", err);
-          statusText.textContent = 'Error al acceder a la cámara.';
-          mainButton.textContent = '▷ Reintentar activar cámara';
-          mainButton.disabled = false;
-          startSpeaking("No se pudo acceder a la cámara. Por favor, revise los permisos en su navegador.");
-        }
-      }
-
-      function stopCameraAndSpeech() {
-        synthesis.cancel();
-        if (stream) stream.getTracks().forEach(track => track.stop());
-        video.srcObject = null;
-        isCameraOn = false;
-        isProcessing = false;
-        lastApiResultText = "";
-        speechQueue = [];
-        currentIndex = 0;
-        mainButton.textContent = '▷ Activar cámara';
-        mainButton.disabled = false;
-        statusText.textContent = 'Cámara inactiva';
+    function speakChunks(chunks, startIndex = 0, includeClosingMessage = false, onEndCallback = () => {}) {
+      if (startIndex >= chunks.length) {
+        isSpeaking = false;
         btnPause.disabled = true;
-        btnRepeat.disabled = true;
-        loader.style.display = 'none';
-      }
 
-      // --- IA ---
-      async function captureAndProcessFrame() {
-        if (!isCameraOn || isProcessing || video.readyState < 2) return;
-
-        isProcessing = true;
-        mainButton.disabled = true;
-        loader.style.display = 'block';
-        statusText.textContent = 'Analizando imagen con la IA...';
-        detectedText.textContent = "Texto detectado: ...";
-        lastApiResultText = "";
-        btnPause.disabled = true;
-        btnRepeat.disabled = true;
-        synthesis.cancel();
-
-        const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
-        const imageData = canvas.toDataURL('image/jpeg');
-
-        try {
-          const response = await fetch(window.location.href, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({image_data: imageData}),
-          });
-
-          loader.style.display = 'none';
-
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || `Error del servidor: ${response.status}`);
+        if (includeClosingMessage) {
+          btnRepeat.disabled = false;
+          const closingMsg = "Si desea volver a escuchar, haga clic en el botón de repetir. Para una nueva lectura, haga clic en el botón de capturar texto.";
+          if (window.navigator.vibrate) {
+            // Patrón: vibrar 200ms, pausa 150ms, vibrar 200ms
+            navigator.vibrate([500, 200, 500]);
           }
-
-          const result = await response.json();
-          const newText = result.text || "No se detectó texto o contenido.";
-          lastApiResultText = newText;
-          detectedText.textContent = `Resultado: "${newText}"`;
-
-          startSpeaking(newText, () => {
-            startSpeaking("Vuelva a capturar otro texto si lo desea.", () => {
-              isProcessing = false;
-              mainButton.disabled = false;
-            });
-          });
-
-        } catch (error) {
-          console.error("Error procesando el frame:", error);
-          const errorMessage = `Ocurrió un error: ${error.message}`;
-          loader.style.display = 'none';
-          statusText.textContent = errorMessage;
-          startSpeaking(errorMessage, () => {
-            isProcessing = false;
-            mainButton.disabled = false;
-          });
-        }
-      }
-
-      // --- EVENTOS ---
-      mainButton.addEventListener('click', () => {
-        isCameraOn ? captureAndProcessFrame() : startCamera();
-      });
-
-      btnPause.addEventListener('click', () => {
-        if (!isPausedManually) {
-          pauseSpeaking();
+          const utterance = new SpeechSynthesisUtterance(closingMsg);
+          utterance.lang = 'es-ES';
+          utterance.rate = 1;
+          utterance.onend = () => {
+            mainButton.disabled = false; // Habilitar captura después del mensaje final
+            onEndCallback();
+          };
+          synthesis.speak(utterance);
         } else {
-          resumeSpeaking();
+          mainButton.disabled = false;
+          btnRepeat.disabled = false;
+          onEndCallback();
         }
-      });
+        return;
+      }
 
-      btnRepeat.addEventListener('click', () => {
-        if (lastApiResultText) startSpeaking(lastApiResultText);
-      });
+      const utterance = new SpeechSynthesisUtterance(chunks[startIndex]);
+      utterance.lang = 'es-ES';
+      utterance.rate = 1;
 
-      window.addEventListener('pagehide', stopCameraAndSpeech);
+      utterance.onstart = () => {
+        isSpeaking = true;
+        statusText.textContent = 'Leyendo...';
+        btnPause.disabled = false;
+        btnPause.textContent = '❚❚ Pausar';
+      };
 
-      startSpeaking("Bienvenido al módulo de lectura. Presione 'Activar cámara' para empezar.");
+      utterance.onend = () => {
+        if (!isPausedManually) {
+          currentChunkIndex = startIndex + 1;
+          speakChunks(chunks, currentChunkIndex, includeClosingMessage, onEndCallback);
+        } else {
+          isSpeaking = false;
+        }
+      };
+
+      utterance.onerror = (e) => {
+        console.error("Error TTS:", e);
+        isSpeaking = false;
+        mainButton.disabled = false;
+      };
+
+      synthesis.speak(utterance);
+    }
+
+    function startSpeaking(text, includeClosingMessage = false, onEndCallback = () => {}) {
+      synthesis.cancel();
+      speechChunks = splitIntoChunks(text);
+      currentChunkIndex = 0;
+      isPausedManually = false;
+      isSpeaking = true;
+      speakChunks(speechChunks, 0, includeClosingMessage, onEndCallback);
+    }
+
+    function pauseSpeaking() {
+      if (isSpeaking && !isPausedManually) {
+        synthesis.cancel();
+        isPausedManually = true;
+        isSpeaking = false;
+        statusText.textContent = 'Lectura en pausa...';
+        btnPause.textContent = '▶ Reanudar';
+      }
+    }
+
+    function resumeSpeaking() {
+      if (isPausedManually && currentChunkIndex < speechChunks.length) {
+        isPausedManually = false;
+        statusText.textContent = 'Reanudando lectura...';
+        btnPause.textContent = '❚❚ Pausar';
+        speakChunks(speechChunks, currentChunkIndex, false); // No incluir mensaje al reanudar
+      }
+    }
+
+    // --- CÁMARA ---
+    async function startCamera() {
+      mainButton.disabled = true;
+      statusText.textContent = 'Iniciando cámara...';
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        video.srcObject = stream;
+        await video.play();
+        isCameraOn = true;
+        mainButton.textContent = '📸 Capturar texto';
+        mainButton.disabled = false;
+        statusText.textContent = 'Cámara activa. Apunte y presione "Capturar texto".';
+        // Mensaje inicial SIN mensaje de cierre
+        startSpeaking("Cámara activada. Apunte y presione el botón para capturar el texto.", false);
+      } catch (err) {
+        console.error("Error al acceder a la cámara:", err);
+        statusText.textContent = 'Error al acceder a la cámara.';
+        mainButton.textContent = '▷ Reintentar activar cámara';
+        mainButton.disabled = false;
+        startSpeaking("No se pudo acceder a la cámara. Por favor, revise los permisos en su navegador.", false);
+      }
+    }
+
+    function stopCameraAndSpeech() {
+      synthesis.cancel();
+      if (stream) stream.getTracks().forEach(track => track.stop());
+      video.srcObject = null;
+      isCameraOn = false;
+      isProcessing = false;
+      lastApiResultText = "";
+      speechChunks = [];
+      currentChunkIndex = 0;
+      isSpeaking = false;
+      isPausedManually = false;
+      mainButton.textContent = '▷ Activar cámara';
+      mainButton.disabled = false;
+      statusText.textContent = 'Cámara inactiva';
+      btnPause.disabled = true;
+      btnRepeat.disabled = true;
+      loader.style.display = 'none';
+    }
+
+    // --- IA ---
+    async function captureAndProcessFrame() {
+      if (!isCameraOn || isProcessing || video.readyState < 2) return;
+
+      isProcessing = true;
+      mainButton.disabled = true;
+      btnPause.disabled = true;
+      btnRepeat.disabled = true;
+      loader.style.display = 'block';
+      statusText.textContent = 'Analizando imagen con la IA...';
+      detectedText.textContent = "Texto detectado: ...";
+      synthesis.cancel();
+
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+      const imageData = canvas.toDataURL('image/jpeg');
+
+      try {
+        const response = await fetch(window.location.href, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image_data: imageData }),
+        });
+
+        loader.style.display = 'none';
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `Error del servidor: ${response.status}`);
+        }
+
+        const result = await response.json();
+        const newText = result.text || "No se detectó texto o contenido.";
+        lastApiResultText = newText;
+        detectedText.textContent = `Resultado: "${newText}"`;
+
+        // Leer el texto de Gemini + mensaje de cierre al final
+        startSpeaking(newText, true, () => {
+          isProcessing = false;
+        });
+
+      } catch (error) {
+        console.error("Error procesando el frame:", error);
+        const errorMessage = `Ocurrió un error: ${error.message}`;
+        loader.style.display = 'none';
+        statusText.textContent = errorMessage;
+        startSpeaking(errorMessage, false, () => {
+          isProcessing = false;
+          mainButton.disabled = false;
+        });
+      }
+    }
+
+    // --- EVENTOS ---
+    mainButton.addEventListener('click', () => {
+      if (isCameraOn) {
+        captureAndProcessFrame();
+      } else {
+        startCamera();
+      }
     });
-  </script>
+
+    btnPause.addEventListener('click', () => {
+      if (isPausedManually) {
+        resumeSpeaking();
+      } else {
+        pauseSpeaking();
+      }
+    });
+
+    btnRepeat.addEventListener('click', () => {
+      if (lastApiResultText) {
+        // Repetir SOLO el texto, sin mensaje de cierre
+        startSpeaking(lastApiResultText, false);
+      }
+    });
+
+    window.addEventListener('pagehide', stopCameraAndSpeech);
+
+    // Mensaje inicial al cargar (sin cierre)
+    startSpeaking("Bienvenido al módulo de lectura. Presione 'Activar cámara' para empezar.", false);
+  });
+</script>
 
 {% endblock %}

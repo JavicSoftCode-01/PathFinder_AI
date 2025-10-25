@@ -44,7 +44,7 @@
         <button type="submit" class="btn btn-submit">💬 Enviar comentarios</button>
       </form>
 
-      <a href="{% url 'auth_api:core:home' %}" class="btn btn-back" id="btn-back-link">🏠 Volver al menú principal</a>
+      <a href="{% url 'auth_api:core:home' %}" class="btn btn-back" id="btn-back-link" style="margin-left:-20px">🏠 Volver al menú principal</a>
     </div>
   </div>
 
@@ -119,7 +119,7 @@
       // 2. Preguntar al usuario si desea dejar un comentario
       function promptForVerbalFeedback() {
         currentState = STATES.WAITING_FOR_COMMENT_CONFIRMATION;
-        const prompt = '¿Desea dar su opinión por voz? Diga sí o no.';
+        const prompt = '¿Desea dar su opinión por voz? Diga claro o no.';
 
         speak(prompt, () => {
           recognition.continuous = false; // Escuchar una sola vez
@@ -190,7 +190,7 @@
         const transcript = event.results[event.results.length - 1][0].transcript.trim().toLowerCase();
 
         if (currentState === STATES.WAITING_FOR_COMMENT_CONFIRMATION) {
-          if (transcript.includes('sí') || transcript.includes('si')) {
+          if (transcript.includes('claro') || transcript.includes('claro')) {
             startCommentCapture();
           } else if (transcript.includes('no')) {
             speak("Entendido, no se registrará una opinión.", () => {
@@ -221,7 +221,7 @@
         setTimeout(() => {
           speak("¿El asistente respondió correctamente a tu comando?", () => {
             setTimeout(() => {
-              speak("Puede responder con los botones o diciendo sí o no después de seleccionar una opción.");
+              speak("Puede responder con los botones sí o no.");
             }, 500);
           });
         }, 1500);

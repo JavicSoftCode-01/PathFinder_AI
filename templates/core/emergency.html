@@ -14,8 +14,8 @@
 
       .emergency-container {
           max-width: 900px;
-          margin: 20px auto;
-          padding: 20px;
+          margin: 5px auto;
+          padding: 10px;
           text-align: center;
           color: var(--text-color);
       }
@@ -25,6 +25,7 @@
           font-weight: bold;
           text-transform: uppercase;
           margin-bottom: 5px;
+          margin-top: 0;
       }
 
       .emergency-container h1 .sos {
@@ -34,7 +35,7 @@
 
       .subtitle {
           font-size: 1.2rem;
-          margin-bottom: 30px;
+          margin-bottom: 20px;
           opacity: 0.9;
       }
 
@@ -129,14 +130,21 @@
 
       .info-panel li {
           display: flex;
-          align-items: center;
+          align-items: flex-start;
           margin-bottom: 15px;
           font-size: 1rem;
+          flex-wrap: wrap;
+          word-break: break-all;
       }
 
       .info-panel li a {
           color: #87ceeb;
           text-decoration: underline;
+      }
+      
+      .info-panel li b {
+          margin-right: 8px;
+          min-width: 85px;
       }
 
       .info-panel .check-icon {
@@ -149,21 +157,45 @@
       .cancel-btn {
           background-color: var(--cancel-green);
           color: var(--text-color);
-          padding: 15px 30px;
+          padding: 30px;
           border: none;
-          border-radius: 50px;
-          font-size: 1.2rem;
+          border-radius: 15px;
+          font-size: 2rem;
           cursor: pointer;
           display: none; /* Oculto por defecto */
-          margin: 0 auto;
           font-weight: bold;
+          position: fixed;
+          left: 50%;
+          top: 50%;
+          transform: translate(-50%, -50%);
+          z-index: 1000;
+          width: 90%;
+          height: 400px;
+          max-width: 500px;
+          box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5);
+          text-transform: uppercase;
+          letter-spacing: 2px;
+          margin-top: 110px;
       }
 
       #countdown-display {
-          font-size: 1.5rem;
+          font-size: 2.5rem;
           font-weight: bold;
           margin-bottom: 15px;
           display: none; /* Oculto por defecto */
+          position: fixed;
+          left: 50%;
+          top: 25%;
+          transform: translate(-50%, -50%);
+          z-index: 1000;
+          background-color: rgba(0, 0, 0, 0.9);
+          padding: 20px 40px;
+          border-radius: 15px;
+          box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+          color: white;
+          width: 90%;
+          max-width: 500px;
+          text-align: center;
       }
 
       /* Estilos de íconos genéricos */
@@ -318,7 +350,7 @@
           });
 
           if (response.ok) {
-            speak("Se envió la alerta, espere pronto su ayuda.");
+            speak("Alerta enviada correctamente. Su contacto de emergencia ha sido notificado. Espere pronto su ayuda.");
           } else {
             throw new Error("El servidor devolvió un error.");
           }
@@ -334,27 +366,32 @@
       const startAlertProcess = () => {
         if (isAlertActive) return;
         isAlertActive = true;
-
-        let countdown = 10;
-        countdownDisplay.textContent = `Enviando alerta en ${countdown}...`;
-        countdownDisplay.style.display = 'block';
-        cancelBtn.style.display = 'inline-block';
         sendAlertBtn.classList.remove('pulsing'); // Detener pulso visual
 
-        startVibration();
-        speak(`Activando alerta de emergencia. La alerta se enviará en ${countdown} segundos. Presione cancelar para detener.`);
+        // Primero hablar, luego comenzar la cuenta regresiva
+        speak(
+          `Activando alerta de emergencia. La alerta se enviará en 10 segundos. Presione cancelar para detener.`,
+          () => {
+            // Este callback se ejecuta cuando termina de hablar
+            let countdown = 10;
+            countdownDisplay.textContent = `Enviando alerta en ${countdown}...`;
+            countdownDisplay.style.display = 'block';
+            cancelBtn.style.display = 'block';
+            startVibration();
 
-        countdownInterval = setInterval(() => {
-          countdown--;
-          countdownDisplay.textContent = `Enviando alerta en ${countdown}...`;
-          if (countdown <= 0) {
-            clearInterval(countdownInterval);
-            stopVibration();
-            countdownDisplay.style.display = 'none';
-            cancelBtn.style.display = 'none';
-            sendAlertAJAX();
+            countdownInterval = setInterval(() => {
+              countdown--;
+              countdownDisplay.textContent = `Enviando alerta en ${countdown}...`;
+              if (countdown <= 0) {
+                clearInterval(countdownInterval);
+                stopVibration();
+                countdownDisplay.style.display = 'none';
+                cancelBtn.style.display = 'none';
+                sendAlertAJAX();
+              }
+            }, 1000);
           }
-        }, 1000);
+        );
       };
 
       // 4. Cancelar el proceso de alerta
