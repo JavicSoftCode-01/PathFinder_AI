@@ -147,7 +147,7 @@ Este proyecto está bajo la Licencia MIT - ver el archivo [LICENSE.md](LICENSE.m
 
 ## 📞 Contacto
 
-rsalazarz@unemi.edu.ec
+rsalazarz@unemi.edu.ec <br>
 mbermeog2@unemi.edu.ec
 
 ## 🙏 Agradecimientos
