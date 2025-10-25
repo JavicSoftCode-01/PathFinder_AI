@@ -174,71 +174,93 @@
 
   <script>
     document.addEventListener('DOMContentLoaded', () => {
-      // --- Referencias a elementos del DOM ---
       const video = document.getElementById('video-feed');
       const statusText = document.getElementById('status-text');
       const detectedText = document.getElementById('detected-text');
       const mainButton = document.getElementById('main-button');
       const btnPause = document.getElementById('btn-pause');
       const btnRepeat = document.getElementById('btn-repeat');
-      const btnBack = document.getElementById('btn-back');
       const loader = document.getElementById('loader');
 
-      // --- Estado de la aplicación ---
       const synthesis = window.speechSynthesis;
       let isCameraOn = false;
       let isProcessing = false;
-      let lastApiResultText = ""; // NUEVO: Variable dedicada solo para el texto de la API.
       let stream;
+      let lastApiResultText = "";
+      let speechQueue = [];
+      let currentIndex = 0;
+      let isPausedManually = false;
 
-      // --- Funciones principales ---
+      // --- FUNCIONES DE VOZ ---
+      function splitText(text) {
+        return text.split(/(?<=[.!?])\s+/); // Divide en oraciones
+      }
 
-      /**
-       * Función centralizada para hablar texto.
-       * Cancela cualquier discurso ANTERIOR y maneja los estados de los botones.
-       * @param {string} text - El texto a leer en voz alta.
-       * @param {function} onEndCallback - Función a ejecutar cuando el discurso termine.
-       */
-      function speak(text, onEndCallback = () => {
+      function speakFrom(index = 0, onEndCallback = () => {
       }) {
-        if (!text || text.trim() === "") {
+        if (index >= speechQueue.length) {
+          btnPause.disabled = true;
+          statusText.textContent = isCameraOn ? 'Cámara activa. Listo para capturar.' : 'Cámara inactiva.';
           onEndCallback();
           return;
         }
 
-        // Si ya está hablando, cancela el enunciado anterior para dar paso al nuevo.
-        if (synthesis.speaking) {
-          synthesis.cancel();
-        }
-
-        const utterance = new SpeechSynthesisUtterance(text);
+        const utterance = new SpeechSynthesisUtterance(speechQueue[index]);
         utterance.lang = 'es-ES';
+        utterance.rate = 1;
 
         utterance.onstart = () => {
-          statusText.textContent = 'Lectura en voz alta activa...';
+          statusText.textContent = 'Leyendo...';
           btnPause.disabled = false;
           btnPause.textContent = '❚❚ Pausar';
         };
 
         utterance.onend = () => {
-          statusText.textContent = isCameraOn ? 'Cámara activa. Listo para capturar.' : 'Cámara inactiva.';
-          btnPause.textContent = '❚❚ Pausar';
-          btnPause.disabled = true;
-          onEndCallback();
+          if (!isPausedManually) {
+            currentIndex = index + 1;
+            if (currentIndex < speechQueue.length) {
+              speakFrom(currentIndex, onEndCallback);
+            } else {
+              btnPause.disabled = true;
+              btnRepeat.disabled = false;
+              statusText.textContent = 'Lectura finalizada.';
+              onEndCallback();
+            }
+          }
         };
 
-        utterance.onerror = (event) => {
-          console.error("Error en la síntesis de voz:", event);
-          btnPause.disabled = true; // Deshabilitar si hay un error
-          onEndCallback();
-        };
-
+        utterance.onerror = (e) => console.error("Error TTS:", e);
         synthesis.speak(utterance);
       }
 
-      /**
-       * Inicia la cámara y actualiza la UI.
-       */
+      function startSpeaking(text, onEndCallback = () => {
+      }) {
+        if (synthesis.speaking) synthesis.cancel();
+        speechQueue = splitText(text);
+        currentIndex = 0;
+        isPausedManually = false;
+        speakFrom(0, onEndCallback);
+      }
+
+      function pauseSpeaking() {
+        if (synthesis.speaking) {
+          synthesis.cancel(); // Detenemos TTS (no pausa real)
+          isPausedManually = true;
+          statusText.textContent = 'Lectura en pausa...';
+          btnPause.textContent = '▶ Reanudar';
+        }
+      }
+
+      function resumeSpeaking() {
+        if (isPausedManually && currentIndex < speechQueue.length) {
+          isPausedManually = false;
+          statusText.textContent = 'Reanudando lectura...';
+          btnPause.textContent = '❚❚ Pausar';
+          speakFrom(currentIndex);
+        }
+      }
+
+      // --- CÁMARA ---
       async function startCamera() {
         mainButton.disabled = true;
         statusText.textContent = 'Iniciando cámara...';
@@ -250,28 +272,25 @@
           mainButton.textContent = '📸 Capturar texto';
           mainButton.disabled = false;
           statusText.textContent = 'Cámara activa. Apunte y presione "Capturar texto".';
-          speak("Cámara activada. Apunte y presione el botón para capturar el texto.");
+          startSpeaking("Cámara activada. Apunte y presione el botón para capturar el texto.");
         } catch (err) {
           console.error("Error al acceder a la cámara:", err);
           statusText.textContent = 'Error al acceder a la cámara.';
           mainButton.textContent = '▷ Reintentar activar cámara';
           mainButton.disabled = false;
-          speak("No se pudo acceder a la cámara. Por favor, revise los permisos en su navegador.");
+          startSpeaking("No se pudo acceder a la cámara. Por favor, revise los permisos en su navegador.");
         }
       }
 
-      /**
-       * Detiene las pistas de la cámara, cancela el habla y limpia el estado.
-       */
       function stopCameraAndSpeech() {
-        if (synthesis.speaking) synthesis.cancel();
-        if (stream) {
-          stream.getTracks().forEach(track => track.stop());
-        }
+        synthesis.cancel();
+        if (stream) stream.getTracks().forEach(track => track.stop());
         video.srcObject = null;
         isCameraOn = false;
         isProcessing = false;
-        lastApiResultText = ""; // MODIFICADO: Limpia el texto guardado al salir.
+        lastApiResultText = "";
+        speechQueue = [];
+        currentIndex = 0;
         mainButton.textContent = '▷ Activar cámara';
         mainButton.disabled = false;
         statusText.textContent = 'Cámara inactiva';
@@ -280,9 +299,7 @@
         loader.style.display = 'none';
       }
 
-      /**
-       * Captura un frame, lo envía al backend y gestiona el flujo de voz.
-       */
+      // --- IA ---
       async function captureAndProcessFrame() {
         if (!isCameraOn || isProcessing || video.readyState < 2) return;
 
@@ -291,12 +308,10 @@
         loader.style.display = 'block';
         statusText.textContent = 'Analizando imagen con la IA...';
         detectedText.textContent = "Texto detectado: ...";
-
-        // MODIFICADO: Limpiamos el resultado anterior y deshabilitamos 'Repetir' al iniciar una nueva captura.
         lastApiResultText = "";
         btnPause.disabled = true;
         btnRepeat.disabled = true;
-        if (synthesis.speaking) synthesis.cancel(); // Detiene cualquier habla anterior.
+        synthesis.cancel();
 
         const canvas = document.createElement('canvas');
         canvas.width = video.videoWidth;
@@ -320,17 +335,11 @@
 
           const result = await response.json();
           const newText = result.text || "No se detectó texto o contenido.";
-
-          // MODIFICADO: Guardamos el resultado de la API en su variable dedicada.
           lastApiResultText = newText;
           detectedText.textContent = `Resultado: "${newText}"`;
-          btnRepeat.disabled = false; // Habilitamos 'Repetir' ahora que tenemos texto.
 
-          // Inicia la secuencia de voz
-          speak(newText, () => {
-            // Cuando termine de leer el resultado, damos la siguiente instrucción.
-            speak("Vuelva a capturar otro texto si lo desea.", () => {
-              // Al final de todo el proceso, reactivamos el botón principal.
+          startSpeaking(newText, () => {
+            startSpeaking("Vuelva a capturar otro texto si lo desea.", () => {
               isProcessing = false;
               mainButton.disabled = false;
             });
@@ -339,50 +348,37 @@
         } catch (error) {
           console.error("Error procesando el frame:", error);
           const errorMessage = `Ocurrió un error: ${error.message}`;
-          statusText.textContent = errorMessage;
           loader.style.display = 'none';
-          detectedText.textContent = "Texto detectado: ...";
-
-          speak(errorMessage, () => {
+          statusText.textContent = errorMessage;
+          startSpeaking(errorMessage, () => {
             isProcessing = false;
             mainButton.disabled = false;
           });
         }
       }
 
-      // --- Asignación de Event Listeners ---
-
+      // --- EVENTOS ---
       mainButton.addEventListener('click', () => {
         isCameraOn ? captureAndProcessFrame() : startCamera();
       });
 
       btnPause.addEventListener('click', () => {
-        if (synthesis.speaking) {
-          if (synthesis.paused) {
-            // Si está pausado, reanúdalo.
-            synthesis.resume();
-            btnPause.textContent = '❚❚ Pausar';
-          } else {
-            // Si está hablando, páusalo.
-            synthesis.pause();
-            btnPause.textContent = '▶ Reanudar';
-          }
+        if (!isPausedManually) {
+          pauseSpeaking();
+        } else {
+          resumeSpeaking();
         }
       });
 
       btnRepeat.addEventListener('click', () => {
-        // MODIFICADO: Usa la variable dedicada para repetir el texto correcto.
-        // Esto no interfiere con el estado de pausa/reanudación, simplemente inicia una nueva lectura del texto guardado.
-        if (lastApiResultText) {
-          speak(lastApiResultText);
-        }
+        if (lastApiResultText) startSpeaking(lastApiResultText);
       });
 
-      // El evento 'pagehide' es más fiable que 'beforeunload' en móviles.
       window.addEventListener('pagehide', stopCameraAndSpeech);
 
-      // Mensaje de bienvenida inicial
-      speak("Bienvenido al módulo de lectura. Presione 'Activar cámara' para empezar.");
+      startSpeaking("Bienvenido al módulo de lectura. Presione 'Activar cámara' para empezar.");
     });
   </script>
+
+
 {% endblock %}
