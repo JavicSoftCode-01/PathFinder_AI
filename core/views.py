@@ -4,6 +4,7 @@ from datetime import datetime
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
+from utils.safe_views import SafeExceptionMixin
 from django.core.mail import send_mail
 from django.http import JsonResponse
 from django.urls import reverse_lazy
@@ -17,7 +18,7 @@ from .forms import UserFeedbackForm
 from .models import TrainingExercise
 
 
-class HomeView(LoginRequiredMixin, TemplateView):
+class HomeView(SafeExceptionMixin, LoginRequiredMixin, TemplateView):
   template_name = 'core/home.html'
 
   def get(self, request, *args, **kwargs):
@@ -33,7 +34,7 @@ class HomeView(LoginRequiredMixin, TemplateView):
     return context
 
 
-class EmergencyView(LoginRequiredMixin, TemplateView):
+class EmergencyView(SafeExceptionMixin, LoginRequiredMixin, TemplateView):
   template_name = 'core/emergency.html'
 
   def get_context_data(self, **kwargs):
@@ -51,7 +52,7 @@ class EmergencyView(LoginRequiredMixin, TemplateView):
 
 
 @method_decorator(csrf_exempt, name='dispatch')
-class SendAlertView(LoginRequiredMixin, View):
+class SendAlertView(SafeExceptionMixin, LoginRequiredMixin, View):
 
   def post(self, request, *args, **kwargs):
     try:
@@ -104,7 +105,7 @@ class SendAlertView(LoginRequiredMixin, View):
       return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
 
-class FeedbackView(LoginRequiredMixin, FormView):
+class FeedbackView(SafeExceptionMixin, LoginRequiredMixin, FormView):
   template_name = 'core/feedback.html'
   form_class = UserFeedbackForm
   success_url = reverse_lazy('auth_api:core:home')
@@ -116,7 +117,7 @@ class FeedbackView(LoginRequiredMixin, FormView):
     return super().form_valid(form)
 
 
-class TrainingModeView(LoginRequiredMixin, TemplateView):
+class TrainingModeView(SafeExceptionMixin, LoginRequiredMixin, TemplateView):
   template_name = 'core/training.html'
 
   def get_context_data(self, **kwargs):

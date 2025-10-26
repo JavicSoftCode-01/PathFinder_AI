@@ -4,6 +4,7 @@ import json
 import google.generativeai as genai
 from django.conf import settings
 from django.contrib.auth.mixins import LoginRequiredMixin
+from utils.safe_views import SafeExceptionMixin
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.utils.decorators import method_decorator
@@ -13,7 +14,7 @@ from django.views.generic import TemplateView
 
 
 @method_decorator(csrf_exempt, name='dispatch')
-class TextReaderView(LoginRequiredMixin, View):
+class TextReaderView(SafeExceptionMixin, LoginRequiredMixin, View):
 
   def get(self, request, *args, **kwargs):
     try:
@@ -81,7 +82,7 @@ class TextReaderView(LoginRequiredMixin, View):
       return JsonResponse({'error': f'Ocurrió un error en el servidor: {str(e)}'}, status=500)
 
 
-class ObstacleDetectionView(LoginRequiredMixin, TemplateView):
+class ObstacleDetectionView(SafeExceptionMixin, LoginRequiredMixin, TemplateView):
   template_name = 'intelligent_assistant/obstacle_detection.html'
 
   def get_context_data(self, **kwargs):

@@ -139,6 +139,13 @@
           .card p {
               font-size: 14px;
           }
+
+          h1 {
+              margin-top: -8px;
+          }
+          .cards-container{
+              margin-top: -10px;
+          }
       }
 
       /* Mejoras de accesibilidad */
@@ -159,7 +166,7 @@
       {% endfor %}
     </div>
   {% endif %}
-  <h1>HOLA {{ user_name }}, BIENVENIDO AL ASISTENTE DE NAVEGACIÓN 👋</h1>
+  <h1>ASISTENTE DE NAVEGACIÓN 👋</h1>
   <div class="cards-container">
     <div class="cards-row top-row">
       <a href="{% url 'auth_api:intelligent_assistant:obstacle_detection' %}" class="card">

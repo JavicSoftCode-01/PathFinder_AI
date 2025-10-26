@@ -1,6 +1,9 @@
 import traceback
 
 from django.contrib import messages
+from django.shortcuts import redirect
+from django.views.decorators.cache import never_cache
+from django.utils.decorators import method_decorator
 from django.contrib.auth.views import LoginView, LogoutView
 from django.core.exceptions import ValidationError
 from django.http import JsonResponse
@@ -10,9 +13,11 @@ from django.views.generic import CreateView
 from auth_api.forms import CustomUserCreationForm
 from auth_api.models import CustomUser
 from auth_api.utils.validators import Validation
+from utils.safe_views import SafeExceptionMixin
 
 
-class RegisterView(CreateView):
+@method_decorator(never_cache, name='dispatch')
+class RegisterView(SafeExceptionMixin, CreateView):
   model = CustomUser
   form_class = CustomUserCreationForm
   template_name = "auth/register.html"
@@ -160,8 +165,14 @@ class RegisterView(CreateView):
     return super().post(request, *args, **kwargs)
 
 
-class CustomLoginView(LoginView):
+@method_decorator(never_cache, name='dispatch')
+class CustomLoginView(SafeExceptionMixin, LoginView):
   template_name = "auth/login.html"
+
+  def dispatch(self, request, *args, **kwargs):
+    if request.user.is_authenticated:
+      return redirect(self.get_success_url())
+    return super().dispatch(request, *args, **kwargs)
 
   def get_success_url(self):
     return reverse_lazy("auth_api:core:home")
@@ -174,7 +185,7 @@ class CustomLoginView(LoginView):
     return self.render_to_response(self.get_context_data(form=form))
 
 
-class CustomLogoutView(LogoutView):
+class CustomLogoutView(SafeExceptionMixin, LogoutView):
   next_page = reverse_lazy("auth_api:login")
 
   def dispatch(self, request, *args, **kwargs):

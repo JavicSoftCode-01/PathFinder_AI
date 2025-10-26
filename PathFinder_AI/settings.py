@@ -25,7 +25,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-jro)-esmc@le)de8k*^q-hzg&-7ol%2_$0gmcme8%5zpdp=!3+'
+SECRET_KEY = os.getenv('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -60,6 +60,7 @@ MIDDLEWARE = [
   'django.contrib.auth.middleware.AuthenticationMiddleware',
   'django.contrib.messages.middleware.MessageMiddleware',
   'django.middleware.clickjacking.XFrameOptionsMiddleware',
+  'utils.middleware.CustomErrorMiddleware', 
 ]
 
 ROOT_URLCONF = 'PathFinder_AI.urls'
@@ -122,8 +123,8 @@ EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'javicsoftcode@gmail.com'
-EMAIL_HOST_PASSWORD = 'ejxh xori lpsp znrt'
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
 
 AUTH_USER_MODEL = 'auth_api.CustomUser'
 
@@ -134,13 +135,14 @@ LOGOUT_REDIRECT_URL = "auth_api:login"
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = 'es-es'
-
-TIME_ZONE = 'UTC'
+# Idioma y zona horaria local (Ecuador)
+LANGUAGE_CODE = 'es-ec'
+TIME_ZONE = 'America/Guayaquil'
 
 USE_I18N = True
-
+USE_L10N = True  
 USE_TZ = True
+
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
@@ -166,8 +168,8 @@ X_FRAME_OPTIONS = 'SAMEORIGIN'
 
 # CSRF configuración (para permitir localhost)
 CSRF_TRUSTED_ORIGINS = [
-  'http://localhost:8369',
-  'http://127.0.0.1:8369',
+  'http://localhost:8000',
+  'http://127.0.0.1:8000',
 ]
 
 # Añade esto al final del archivo
