@@ -138,7 +138,7 @@ body {
     align-items: center;
 }
 
-.icon-btn {
+.icon-btn, .toggle-password-btn {
     background: none;
     border: none;
     cursor: pointer;
@@ -149,7 +149,7 @@ body {
     color: white;
 }
 
-.icon-btn:hover {
+.icon-btn:hover, .toggle-password-btn:hover {
     opacity: 1;
 }
 
@@ -404,7 +404,7 @@ body {
     }
 
     /* Botón de micrófono más grande */
-    .icon-btn {
+    .icon-btn, .toggle-password-btn {
         font-size: 2rem;
         padding: 12px;
         width: 50px;
@@ -416,7 +416,7 @@ body {
         background: rgba(255, 255, 255, 0.1);
     }
 
-    .icon-btn:active {
+    .icon-btn:active, .toggle-password-btn:active {
         background: rgba(155, 215, 68, 0.3);
         transform: scale(0.95);
     }
@@ -508,7 +508,7 @@ body {
         font-size: 1.1rem;
     }
 
-    .icon-btn {
+    .icon-btn, .toggle-password-btn {
         font-size: 1.8rem;
         width: 45px;
         height: 45px;

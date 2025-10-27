@@ -20,6 +20,31 @@ inputs.forEach(input => {
   }
 });
 
+// ============================================
+// MOSTRAR/OCULTAR CONTRASEÑAS
+// ============================================
+const togglePasswordBtns = document.querySelectorAll('.toggle-password-btn');
+
+togglePasswordBtns.forEach(btn => {
+  btn.addEventListener('click', function () {
+    const targetField = this.getAttribute('data-target');
+    const passwordInput = document.querySelector(`input[name="${targetField}"]`);
+
+    if (!passwordInput) return;
+
+    // Alternar entre password y text
+    if (passwordInput.type === 'password') {
+      passwordInput.type = 'text';
+      this.textContent = '🙈'; // Cambiar icono a "ocultar"
+      this.title = 'Ocultar contraseña';
+    } else {
+      passwordInput.type = 'password';
+      this.textContent = '👁️'; // Cambiar icono a "mostrar"
+      this.title = 'Mostrar contraseña';
+    }
+  });
+});
+
 function validateField(field, speakFeedback = false) {
   const fieldName = field.name;
   const validationIcon = document.querySelector(`[data-field="${fieldName}"]`);

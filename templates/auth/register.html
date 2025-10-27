@@ -106,6 +106,9 @@
           {{ form.password1 }}
           <div class="input-icons">
             <button type="button" class="icon-btn" title="Entrada por voz">🎤</button>
+            <button type="button" class="toggle-password-btn" data-target="password1"
+                    title="Mostrar/Ocultar contraseña">👁️
+            </button>
             <span class="validation-icon" data-field="password1" style="display: none;">✓</span>
           </div>
         </div>
@@ -123,6 +126,9 @@
           {{ form.password2 }}
           <div class="input-icons">
             <button type="button" class="icon-btn" title="Entrada por voz">🎤</button>
+            <button type="button" class="toggle-password-btn" data-target="password2"
+                    title="Mostrar/Ocultar contraseña">👁️
+            </button>
             <span class="validation-icon" data-field="password2" style="display: none;">✓</span>
           </div>
         </div>
@@ -184,7 +190,7 @@
     </div>
 
     <!-- Card del Asistente -->
-    <div class="assistant-card" >
+    <div class="assistant-card">
       <div class="assistant-illustration">
         <img src="{% static 'images/assistant-illustration.png' %}"
              alt="Asistente de navegación para personas con discapacidad visual">
@@ -207,6 +213,6 @@
   </form>
 </div>
 
-<script src="{% static 'js/voice-recognition-register.js' %}"></script>
+<script src="{% static 'js/voice_recognition_register.js' %}"></script>
 </body>
 </html>

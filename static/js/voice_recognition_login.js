@@ -10,6 +10,27 @@ inputs.forEach(input => {
   });
 });
 
+// ============================================
+// MOSTRAR/OCULTAR CONTRASEÑA
+// ============================================
+const togglePasswordBtn = document.querySelector('.toggle-password-btn');
+const passwordInput = document.querySelector('#id_password');
+
+if (togglePasswordBtn && passwordInput) {
+  togglePasswordBtn.addEventListener('click', function () {
+    // Alternar entre password y text
+    if (passwordInput.type === 'password') {
+      passwordInput.type = 'text';
+      this.textContent = '🙈'; // Cambiar icono a "ocultar"
+      this.title = 'Ocultar contraseña';
+    } else {
+      passwordInput.type = 'password';
+      this.textContent = '👁️'; // Cambiar icono a "mostrar"
+      this.title = 'Mostrar contraseña';
+    }
+  });
+}
+
 function validateField(field, speakFeedback = false) {
   const fieldName = field.name;
   const validationIcon = field.parentElement.querySelector('.validation-icon');
