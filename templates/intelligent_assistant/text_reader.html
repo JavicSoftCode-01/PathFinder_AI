@@ -195,7 +195,6 @@
 
     // --- UTILS ---
     function splitIntoChunks(text) {
-      // Divide en fragmentos de máximo 3 palabras
       const words = text.trim().split(/\s+/);
       const chunks = [];
       for (let i = 0; i < words.length; i += 3) {
@@ -204,29 +203,33 @@
       return chunks;
     }
 
+    function updateRepeatButton() {
+      const hasValidText = lastApiResultText && 
+                          lastApiResultText.trim() !== "" && 
+                          lastApiResultText !== "No se detectó texto o contenido.";
+      btnRepeat.disabled = !hasValidText;
+    }
+
     function speakChunks(chunks, startIndex = 0, includeClosingMessage = false, onEndCallback = () => {}) {
       if (startIndex >= chunks.length) {
         isSpeaking = false;
         btnPause.disabled = true;
 
         if (includeClosingMessage) {
-          btnRepeat.disabled = false;
           const closingMsg = "Si desea volver a escuchar, haga clic en el botón de repetir. Para una nueva lectura, haga clic en el botón de capturar texto.";
           if (window.navigator.vibrate) {
-            // Patrón: vibrar 200ms, pausa 150ms, vibrar 200ms
             navigator.vibrate([500, 200, 500]);
           }
           const utterance = new SpeechSynthesisUtterance(closingMsg);
           utterance.lang = 'es-ES';
           utterance.rate = 1;
           utterance.onend = () => {
-            mainButton.disabled = false; // Habilitar captura después del mensaje final
+            enableCaptureMode();
             onEndCallback();
           };
           synthesis.speak(utterance);
         } else {
-          mainButton.disabled = false;
-          btnRepeat.disabled = false;
+          enableCaptureMode();
           onEndCallback();
         }
         return;
@@ -255,7 +258,7 @@
       utterance.onerror = (e) => {
         console.error("Error TTS:", e);
         isSpeaking = false;
-        mainButton.disabled = false;
+        enableCaptureMode();
       };
 
       synthesis.speak(utterance);
@@ -285,12 +288,22 @@
         isPausedManually = false;
         statusText.textContent = 'Reanudando lectura...';
         btnPause.textContent = '❚❚ Pausar';
-        speakChunks(speechChunks, currentChunkIndex, false); // No incluir mensaje al reanudar
+        speakChunks(speechChunks, currentChunkIndex, false);
       }
+    }
+
+    function enableCaptureMode() {
+      isProcessing = false;
+      mainButton.disabled = false;
+      mainButton.textContent = '📸 Capturar texto';
+      statusText.textContent = 'Cámara activa. Apunte y presione "Capturar texto".';
+      updateRepeatButton(); // ✅ Actualiza el estado del botón "Repetir"
     }
 
     // --- CÁMARA ---
     async function startCamera() {
+      if (isCameraOn) return;
+
       mainButton.disabled = true;
       statusText.textContent = 'Iniciando cámara...';
       try {
@@ -298,10 +311,7 @@
         video.srcObject = stream;
         await video.play();
         isCameraOn = true;
-        mainButton.textContent = '📸 Capturar texto';
-        mainButton.disabled = false;
-        statusText.textContent = 'Cámara activa. Apunte y presione "Capturar texto".';
-        // Mensaje inicial SIN mensaje de cierre
+        enableCaptureMode();
         startSpeaking("Cámara activada. Apunte y presione el botón para capturar el texto.", false);
       } catch (err) {
         console.error("Error al acceder a la cámara:", err);
@@ -327,13 +337,16 @@
       mainButton.disabled = false;
       statusText.textContent = 'Cámara inactiva';
       btnPause.disabled = true;
-      btnRepeat.disabled = true;
+      updateRepeatButton(); // ✅ Asegura que "Repetir" se desactive
       loader.style.display = 'none';
     }
 
     // --- IA ---
     async function captureAndProcessFrame() {
-      if (!isCameraOn || isProcessing || video.readyState < 2) return;
+      if (!isCameraOn || isProcessing || video.readyState < 2) {
+        console.warn("No se puede capturar: cámara no lista o en procesamiento.");
+        return;
+      }
 
       isProcessing = true;
       mainButton.disabled = true;
@@ -368,20 +381,19 @@
         const newText = result.text || "No se detectó texto o contenido.";
         lastApiResultText = newText;
         detectedText.textContent = `Resultado: "${newText}"`;
+        updateRepeatButton(); // ✅ Habilita "Repetir" si hay texto válido
 
-        // Leer el texto de Gemini + mensaje de cierre al final
         startSpeaking(newText, true, () => {
           isProcessing = false;
         });
 
       } catch (error) {
         console.error("Error procesando el frame:", error);
-        const errorMessage = `Ocurrió un error: ${error.message}`;
         loader.style.display = 'none';
-        statusText.textContent = errorMessage;
-        startSpeaking(errorMessage, false, () => {
+        statusText.textContent = `Error: ${error.message}`;
+        startSpeaking(`Ocurrió un error: ${error.message}`, false, () => {
           isProcessing = false;
-          mainButton.disabled = false;
+          enableCaptureMode();
         });
       }
     }
@@ -405,14 +417,13 @@
 
     btnRepeat.addEventListener('click', () => {
       if (lastApiResultText) {
-        // Repetir SOLO el texto, sin mensaje de cierre
         startSpeaking(lastApiResultText, false);
       }
     });
 
     window.addEventListener('pagehide', stopCameraAndSpeech);
 
-    // Mensaje inicial al cargar (sin cierre)
+    // Mensaje inicial
     startSpeaking("Bienvenido al módulo de lectura. Presione 'Activar cámara' para empezar.", false);
   });
 </script>
