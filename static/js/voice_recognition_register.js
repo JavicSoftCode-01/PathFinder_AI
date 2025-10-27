@@ -264,7 +264,7 @@ function cleanNameText(text) {
 }
 
 function cleanPasswordText(text) {
-  return text.trim().replace(/\s+/g, '');
+  return text.toLowerCase().trim().replace(/\s+/g, '');
 }
 
 // ============================================
