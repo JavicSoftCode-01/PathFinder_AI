@@ -23,7 +23,7 @@ class HomeView(SafeExceptionMixin, LoginRequiredMixin, TemplateView):
 
   def get(self, request, *args, **kwargs):
     if not request.session.get('welcome_shown', False):
-      messages.success(request, f"Bienvenido {request.user.full_name} 👋")
+      messages.success(request, f"Bienvenido {request.user.full_name}")
       request.session['welcome_shown'] = True
     return super().get(request, *args, **kwargs)
 
