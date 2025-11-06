@@ -259,6 +259,26 @@
           flex-grow: 1;
       }
 
+      /* Indicador de procesamiento Gemini */
+      .gemini-indicator {
+          position: absolute;
+          top: 10px;
+          right: 10px;
+          background: rgba(106, 27, 154, 0.9);
+          color: white;
+          padding: 8px 15px;
+          border-radius: 20px;
+          font-size: 0.9rem;
+          font-weight: bold;
+          display: none;
+          z-index: 11;
+          animation: pulse 1.5s infinite;
+      }
+
+      .gemini-indicator.active {
+          display: block;
+      }
+
       @media (max-width: 900px) {
           .detection-grid {
               grid-template-columns: 1fr;
@@ -319,6 +339,7 @@
         <div class="camera-view-container">
           <video id="video-feed" autoplay playsinline muted></video>
           <div id="status-message">Esperando activación de cámara...</div>
+          <div class="gemini-indicator" id="gemini-indicator">🔮 Analizando con Gemini...</div>
         </div>
         <div class="audio-control">
           <span>🔊</span>
@@ -338,39 +359,98 @@
       const btnRepeat = document.getElementById('btn-repeat');
       const volumeSlider = document.getElementById('volume-slider');
       const micStatus = document.getElementById('mic-status');
+      const geminiIndicator = document.getElementById('gemini-indicator');
       const indicators = {
         left: document.getElementById('indicator-left'),
         center: document.getElementById('indicator-center'),
         right: document.getElementById('indicator-right')
       };
 
+      // Variables de control
       let processingInterval = null;
       let isCameraOn = false;
       let isSpeaking = false;
       let lastInstruction = "Sin instrucciones aún.";
+      let lastInstructionText = ""; // Para control de texto sin hablar
       let socket = null;
       let recognition = null;
       let isListening = false;
+      let speechQueue = []; // Cola de instrucciones para hablar
+      let isProcessingQueue = false;
 
       const synth = window.speechSynthesis;
 
-      const speak = (text, onEndCallback = null) => {
-        if (isSpeaking || !text) return;
-        isSpeaking = true;
-        synth.cancel();
-        const u = new SpeechSynthesisUtterance(text);
-        u.lang = 'es-ES';
-        u.volume = parseFloat(volumeSlider.value);
-        u.rate = 1.1;
-        u.onend = () => {
-          isSpeaking = false;
-          // Ejecutar callback después de terminar de hablar
-          if (onEndCallback && typeof onEndCallback === 'function') {
-            onEndCallback();
-          }
+      /**
+       * Sistema de cola para evitar superposición de voz
+       * Garantiza que cada instrucción se complete antes de la siguiente
+       */
+      const speak = (text, priority = false, onEndCallback = null) => {
+        if (!text || text.trim() === '') return;
+
+        const speechItem = {
+          text: text.trim(),
+          callback: onEndCallback,
+          priority: priority
         };
-        synth.speak(u);
-        lastInstruction = text;
+
+        // Instrucciones prioritarias (de Gemini) van al inicio
+        if (priority) {
+          speechQueue.unshift(speechItem);
+        } else {
+          speechQueue.push(speechItem);
+        }
+
+        processNextSpeech();
+      };
+
+      const processNextSpeech = () => {
+        // Si ya está hablando o no hay nada en cola, salir
+        if (isSpeaking || speechQueue.length === 0 || isProcessingQueue) return;
+
+        isProcessingQueue = true;
+        const item = speechQueue.shift();
+        
+        isSpeaking = true;
+        synth.cancel(); // Cancelar cualquier voz pendiente
+
+        const utterance = new SpeechSynthesisUtterance(item.text);
+        utterance.lang = 'es-ES';
+        utterance.volume = parseFloat(volumeSlider.value);
+        
+        // Velocidad ajustada para mejor comprensión
+        // 1.0 = normal, < 1.0 = más lento, > 1.0 = más rápido
+        utterance.rate = 0.95; // Ligeramente más lento para claridad
+        
+        // Pitch normal para voz natural
+        utterance.pitch = 1.0;
+
+        utterance.onend = () => {
+          isSpeaking = false;
+          isProcessingQueue = false;
+          lastInstruction = item.text;
+
+          // Ejecutar callback si existe
+          if (item.callback && typeof item.callback === 'function') {
+            item.callback();
+          }
+
+          // Procesar siguiente en cola después de pequeña pausa
+          setTimeout(() => {
+            processNextSpeech();
+          }, 300); // 300ms de pausa entre instrucciones
+        };
+
+        utterance.onerror = (event) => {
+          console.error('Error en síntesis de voz:', event);
+          isSpeaking = false;
+          isProcessingQueue = false;
+          // Intentar siguiente en cola
+          setTimeout(() => {
+            processNextSpeech();
+          }, 500);
+        };
+
+        synth.speak(utterance);
       };
 
       // Inicializar reconocimiento de voz
@@ -396,9 +476,13 @@
           const transcript = event.results[0][0].transcript.toLowerCase();
           console.log('Comando escuchado:', transcript);
 
-          if (transcript.includes('cámara') && (transcript.includes('activa') || transcript.includes('activar') || transcript.includes('active'))) {
-            speak('Activando cámara');
-            setTimeout(() => startCamera(), 500);
+          if (transcript.includes('cámara') && 
+              (transcript.includes('activa') || 
+               transcript.includes('activar') || 
+               transcript.includes('active'))) {
+            speak('Activando cámara', false, () => {
+              setTimeout(() => startCamera(), 500);
+            });
           }
         };
 
@@ -419,7 +503,6 @@
         if (recognition && !isListening && !isCameraOn) {
           try {
             recognition.start();
-            // Detener automáticamente después de 7 segundos
             setTimeout(() => {
               if (isListening) {
                 recognition.stop();
@@ -436,42 +519,67 @@
         socket = new WebSocket(`${wsScheme}://${window.location.host}/ws/obstacle_detection/`);
 
         socket.onopen = () => {
-          console.log("WebSocket conectado.");
+          console.log("✅ WebSocket conectado");
           connectionStatus.textContent = "CONECTADO";
           statusMessage.classList.add('hidden');
           video.classList.add('active');
-          speak("Guía inteligente conectada. Iniciando detección.");
-          processingInterval = setInterval(sendFrame, 500);
+          
+          speak("Guía inteligente conectada. Iniciando detección.", false);
+          
+          // 1 frame por segundo = 7 frames en 7 segundos
+          // Sincronizado con intervalo de Gemini
+          processingInterval = setInterval(sendFrame, 1000);
         };
 
         socket.onmessage = (event) => {
           const data = JSON.parse(event.data);
 
-          // Actualizar indicadores visuales SIEMPRE
+          // Actualizar indicadores visuales SIEMPRE (no depende de voz)
           indicators.left.className = data.zones.left ? "left blocked" : "left clear";
           indicators.center.className = data.zones.center ? "center blocked" : "center clear";
           indicators.right.className = data.zones.right ? "right blocked" : "right clear";
 
-          // Solo hablar si no está en modo silencioso y la instrucción es nueva
-          if (data.instruction && !data.silent) {
-            if (data.instruction !== lastInstruction || data.from_gemini) {
-              instructionBox.textContent = data.instruction;
-              if (!isSpeaking) {
-                speak(data.instruction);
-              }
+          // Procesar instrucciones
+          if (data.instruction) {
+            // Actualizar texto visual siempre
+            instructionBox.textContent = data.instruction;
+
+            // Mostrar indicador si viene de Gemini
+            if (data.from_gemini) {
+              geminiIndicator.classList.add('active');
+              console.log('🔮 Instrucción de Gemini:', data.instruction);
+              
+              setTimeout(() => {
+                geminiIndicator.classList.remove('active');
+              }, 3000);
+            }
+
+            // Control de voz inteligente
+            const shouldSpeak = !data.silent && 
+                              data.instruction !== lastInstructionText;
+
+            if (shouldSpeak) {
+              lastInstructionText = data.instruction;
+              
+              // Instrucciones de Gemini tienen prioridad
+              const isPriority = data.from_gemini === true;
+              
+              speak(data.instruction, isPriority);
             }
           }
         };
 
         socket.onclose = () => {
-          console.log("WebSocket desconectado. Intentando reconectar...");
+          console.log("❌ WebSocket desconectado. Reconectando...");
           connectionStatus.textContent = "RECONECTANDO...";
           clearInterval(processingInterval);
+          
+          // Intentar reconectar después de 3 segundos
           setTimeout(connectWebSocket, 3000);
         };
 
         socket.onerror = (err) => {
-          console.error("Error de WebSocket:", err);
+          console.error("❌ Error de WebSocket:", err);
           connectionStatus.textContent = "ERROR";
           socket.close();
         };
@@ -486,53 +594,80 @@
         const ctx = canvas.getContext('2d');
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-        const imageData = canvas.toDataURL('image/jpeg', 0.5);
+        // Calidad 0.6 para balance entre tamaño y detalle
+        const imageData = canvas.toDataURL('image/jpeg', 0.6);
         socket.send(JSON.stringify({'image': imageData}));
       }
 
       async function startCamera() {
         if (isCameraOn) return;
+        
         statusMessage.textContent = "Iniciando cámara...";
         statusMessage.classList.remove('hidden');
+        
         try {
-          const stream = await navigator.mediaDevices.getUserMedia({video: {facingMode: 'environment'}});
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { 
+              facingMode: 'environment',
+              width: { ideal: 1280 },
+              height: { ideal: 720 }
+            }
+          });
+          
           video.srcObject = stream;
-          await new Promise(r => video.onloadedmetadata = r);
+          await new Promise(resolve => video.onloadedmetadata = resolve);
+          
           statusMessage.textContent = "Conectando con el servidor...";
           isCameraOn = true;
           btnStart.textContent = "Guía Activa ✓";
           btnStart.disabled = true;
+          
           connectWebSocket();
         } catch (e) {
-          console.error(e);
-          speak("No se pudo acceder a la cámara.");
-          statusMessage.textContent = "Error de cámara.";
+          console.error('❌ Error al acceder a la cámara:', e);
+          speak("No se pudo acceder a la cámara. Verifique los permisos.");
+          statusMessage.textContent = "Error de cámara. Verifique permisos.";
         }
       }
 
+      // Event listeners
       btnStart.addEventListener('click', startCamera);
-      btnRepeat.addEventListener('click', () => speak(lastInstruction));
+      
+      btnRepeat.addEventListener('click', () => {
+        if (lastInstruction && lastInstruction !== "Sin instrucciones aún.") {
+          // Limpiar cola y hablar inmediatamente
+          speechQueue = [];
+          synth.cancel();
+          isSpeaking = false;
+          speak(lastInstruction, true);
+        }
+      });
 
+      // Limpieza al salir
       window.addEventListener('beforeunload', () => {
         if (processingInterval) clearInterval(processingInterval);
-        if (video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
+        if (video.srcObject) {
+          video.srcObject.getTracks().forEach(track => track.stop());
+        }
         if (socket) socket.close();
         if (recognition) recognition.abort();
         synth.cancel();
       });
 
-      // Inicialización al cargar la página - CORREGIDO
+      // Inicialización al cargar
       setTimeout(() => {
-        initVoiceRecognition(); // Primero inicializa el reconocimiento
+        initVoiceRecognition();
 
-        // Habla y cuando termine, activa el micrófono
-        speak("Bienvenido a Guía Inteligente. Puede presionar el botón para iniciar, o decir: cámara activa, para activar por voz.", () => {
-          // Este callback se ejecuta DESPUÉS de que termine de hablar
-          console.log('Voz terminó, iniciando escucha...');
-          setTimeout(() => {
-            startListening();
-          }, 500); // Pequeña pausa de 500ms después de que termine de hablar
-        });
+        speak(
+          "Bienvenido a Guía Inteligente. Puede presionar el botón para iniciar, o decir: cámara activa, para activar por voz.",
+          false,
+          () => {
+            console.log('✅ Mensaje de bienvenida completado');
+            setTimeout(() => {
+              startListening();
+            }, 500);
+          }
+        );
       }, 500);
     });
   </script>
