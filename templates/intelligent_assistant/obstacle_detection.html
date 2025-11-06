@@ -348,328 +348,289 @@
       </div>
     </div>
   </div>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    // --- Referencias a elementos del DOM ---
+    const video = document.getElementById('video-feed');
+    const instructionBox = document.getElementById('instruction-box');
+    const statusMessage = document.getElementById('status-message');
+    const connectionStatus = document.getElementById('connection-status');
+    const btnStart = document.getElementById('btn-start');
+    const btnRepeat = document.getElementById('btn-repeat');
+    const volumeSlider = document.getElementById('volume-slider');
+    const micStatus = document.getElementById('mic-status'); // Indicador visual del micrófono
+    const geminiIndicator = document.getElementById('gemini-indicator');
+    
+    // --- Variables de Estado y Control ---
+    let isGuidanceActive = false;
+    let isCameraOn = false;
+    let lastSpokenInstruction = "Sin instrucciones aún.";
+    let socket = null;
+    const synth = window.speechSynthesis;
+    let isSpeaking = false;
+    
+    // --- Variables para Reconocimiento de Voz ---
+    let recognition = null;
+    let isListening = false;
 
-  <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      const video = document.getElementById('video-feed');
-      const instructionBox = document.getElementById('instruction-box');
-      const statusMessage = document.getElementById('status-message');
-      const connectionStatus = document.getElementById('connection-status');
-      const btnStart = document.getElementById('btn-start');
-      const btnRepeat = document.getElementById('btn-repeat');
-      const volumeSlider = document.getElementById('volume-slider');
-      const micStatus = document.getElementById('mic-status');
-      const geminiIndicator = document.getElementById('gemini-indicator');
-      const indicators = {
-        left: document.getElementById('indicator-left'),
-        center: document.getElementById('indicator-center'),
-        right: document.getElementById('indicator-right')
-      };
-
-      // Variables de control
-      let processingInterval = null;
-      let isCameraOn = false;
-      let isSpeaking = false;
-      let lastInstruction = "Sin instrucciones aún.";
-      let lastInstructionText = ""; // Para control de texto sin hablar
-      let socket = null;
-      let recognition = null;
-      let isListening = false;
-      let speechQueue = []; // Cola de instrucciones para hablar
-      let isProcessingQueue = false;
-
-      const synth = window.speechSynthesis;
-
-      /**
-       * Sistema de cola para evitar superposición de voz
-       * Garantiza que cada instrucción se complete antes de la siguiente
-       */
-      const speak = (text, priority = false, onEndCallback = null) => {
-        if (!text || text.trim() === '') return;
-
-        const speechItem = {
-          text: text.trim(),
-          callback: onEndCallback,
-          priority: priority
-        };
-
-        // Instrucciones prioritarias (de Gemini) van al inicio
-        if (priority) {
-          speechQueue.unshift(speechItem);
-        } else {
-          speechQueue.push(speechItem);
-        }
-
-        processNextSpeech();
-      };
-
-      const processNextSpeech = () => {
-        // Si ya está hablando o no hay nada en cola, salir
-        if (isSpeaking || speechQueue.length === 0 || isProcessingQueue) return;
-
-        isProcessingQueue = true;
-        const item = speechQueue.shift();
-        
-        isSpeaking = true;
-        synth.cancel(); // Cancelar cualquier voz pendiente
-
-        const utterance = new SpeechSynthesisUtterance(item.text);
-        utterance.lang = 'es-ES';
-        utterance.volume = parseFloat(volumeSlider.value);
-        
-        // Velocidad ajustada para mejor comprensión
-        // 1.0 = normal, < 1.0 = más lento, > 1.0 = más rápido
-        utterance.rate = 0.95; // Ligeramente más lento para claridad
-        
-        // Pitch normal para voz natural
-        utterance.pitch = 1.0;
-
-        utterance.onend = () => {
-          isSpeaking = false;
-          isProcessingQueue = false;
-          lastInstruction = item.text;
-
-          // Ejecutar callback si existe
-          if (item.callback && typeof item.callback === 'function') {
-            item.callback();
-          }
-
-          // Procesar siguiente en cola después de pequeña pausa
-          setTimeout(() => {
-            processNextSpeech();
-          }, 300); // 300ms de pausa entre instrucciones
-        };
-
-        utterance.onerror = (event) => {
-          console.error('Error en síntesis de voz:', event);
-          isSpeaking = false;
-          isProcessingQueue = false;
-          // Intentar siguiente en cola
-          setTimeout(() => {
-            processNextSpeech();
-          }, 500);
-        };
-
-        synth.speak(utterance);
-      };
-
-      // Inicializar reconocimiento de voz
-      function initVoiceRecognition() {
-        if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-          console.log('Reconocimiento de voz no soportado');
-          return;
-        }
-
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        recognition = new SpeechRecognition();
-        recognition.lang = 'es-ES';
-        recognition.continuous = false;
-        recognition.interimResults = false;
-
-        recognition.onstart = () => {
-          isListening = true;
-          micStatus.classList.add('listening');
-          console.log('Escuchando comando...');
-        };
-
-        recognition.onresult = (event) => {
-          const transcript = event.results[0][0].transcript.toLowerCase();
-          console.log('Comando escuchado:', transcript);
-
-          if (transcript.includes('cámara') && 
-              (transcript.includes('activa') || 
-               transcript.includes('activar') || 
-               transcript.includes('active'))) {
-            speak('Activando cámara', false, () => {
-              setTimeout(() => startCamera(), 500);
-            });
-          }
-        };
-
-        recognition.onerror = (event) => {
-          console.error('Error de reconocimiento:', event.error);
-          isListening = false;
-          micStatus.classList.remove('listening');
-        };
-
-        recognition.onend = () => {
-          isListening = false;
-          micStatus.classList.remove('listening');
-          console.log('Reconocimiento finalizado');
-        };
+    /**
+     * Habla un texto dado. Usa una bandera para evitar hablar múltiples
+     * cosas a la vez. El callback se ejecuta cuando termina de hablar.
+     */
+    const speak = (text, onEndCallback = null) => {
+      if (!text || text.trim() === '') {
+        if (onEndCallback) onEndCallback();
+        return;
       }
 
-      function startListening() {
-        if (recognition && !isListening && !isCameraOn) {
-          try {
-            recognition.start();
-            setTimeout(() => {
-              if (isListening) {
-                recognition.stop();
-              }
-            }, 7000);
-          } catch (e) {
-            console.error('Error al iniciar reconocimiento:', e);
-          }
-        }
+      if (isSpeaking) {
+        synth.cancel(); // Si está hablando, cancela para dar prioridad a lo nuevo.
       }
-
-      function connectWebSocket() {
-        const wsScheme = window.location.protocol === "https:" ? "wss" : "ws";
-        socket = new WebSocket(`${wsScheme}://${window.location.host}/ws/obstacle_detection/`);
-
-        socket.onopen = () => {
-          console.log("✅ WebSocket conectado");
-          connectionStatus.textContent = "CONECTADO";
-          statusMessage.classList.add('hidden');
-          video.classList.add('active');
-          
-          speak("Guía inteligente conectada. Iniciando detección.", false);
-          
-          // 1 frame por segundo = 7 frames en 7 segundos
-          // Sincronizado con intervalo de Gemini
-          processingInterval = setInterval(sendFrame, 1000);
-        };
-
-        socket.onmessage = (event) => {
-          const data = JSON.parse(event.data);
-
-          // Actualizar indicadores visuales SIEMPRE (no depende de voz)
-          indicators.left.className = data.zones.left ? "left blocked" : "left clear";
-          indicators.center.className = data.zones.center ? "center blocked" : "center clear";
-          indicators.right.className = data.zones.right ? "right blocked" : "right clear";
-
-          // Procesar instrucciones
-          if (data.instruction) {
-            // Actualizar texto visual siempre
-            instructionBox.textContent = data.instruction;
-
-            // Mostrar indicador si viene de Gemini
-            if (data.from_gemini) {
-              geminiIndicator.classList.add('active');
-              console.log('🔮 Instrucción de Gemini:', data.instruction);
-              
-              setTimeout(() => {
-                geminiIndicator.classList.remove('active');
-              }, 3000);
-            }
-
-            // Control de voz inteligente
-            const shouldSpeak = !data.silent && 
-                              data.instruction !== lastInstructionText;
-
-            if (shouldSpeak) {
-              lastInstructionText = data.instruction;
-              
-              // Instrucciones de Gemini tienen prioridad
-              const isPriority = data.from_gemini === true;
-              
-              speak(data.instruction, isPriority);
-            }
-          }
-        };
-
-        socket.onclose = () => {
-          console.log("❌ WebSocket desconectado. Reconectando...");
-          connectionStatus.textContent = "RECONECTANDO...";
-          clearInterval(processingInterval);
-          
-          // Intentar reconectar después de 3 segundos
-          setTimeout(connectWebSocket, 3000);
-        };
-
-        socket.onerror = (err) => {
-          console.error("❌ Error de WebSocket:", err);
-          connectionStatus.textContent = "ERROR";
-          socket.close();
-        };
-      }
-
-      function sendFrame() {
-        if (!isCameraOn || socket.readyState !== WebSocket.OPEN) return;
-
-        const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-        // Calidad 0.6 para balance entre tamaño y detalle
-        const imageData = canvas.toDataURL('image/jpeg', 0.6);
-        socket.send(JSON.stringify({'image': imageData}));
-      }
-
-      async function startCamera() {
-        if (isCameraOn) return;
-        
-        statusMessage.textContent = "Iniciando cámara...";
-        statusMessage.classList.remove('hidden');
-        
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({
-            video: { 
-              facingMode: 'environment',
-              width: { ideal: 1280 },
-              height: { ideal: 720 }
-            }
-          });
-          
-          video.srcObject = stream;
-          await new Promise(resolve => video.onloadedmetadata = resolve);
-          
-          statusMessage.textContent = "Conectando con el servidor...";
-          isCameraOn = true;
-          btnStart.textContent = "Guía Activa ✓";
-          btnStart.disabled = true;
-          
-          connectWebSocket();
-        } catch (e) {
-          console.error('❌ Error al acceder a la cámara:', e);
-          speak("No se pudo acceder a la cámara. Verifique los permisos.");
-          statusMessage.textContent = "Error de cámara. Verifique permisos.";
-        }
-      }
-
-      // Event listeners
-      btnStart.addEventListener('click', startCamera);
       
-      btnRepeat.addEventListener('click', () => {
-        if (lastInstruction && lastInstruction !== "Sin instrucciones aún.") {
-          // Limpiar cola y hablar inmediatamente
-          speechQueue = [];
-          synth.cancel();
-          isSpeaking = false;
-          speak(lastInstruction, true);
+      isSpeaking = true;
+      const utterance = new SpeechSynthesisUtterance(text.trim());
+      utterance.lang = 'es-ES';
+      // Lee el valor actual del slider de volumen cada vez que va a hablar.
+      utterance.volume = parseFloat(volumeSlider.value);
+      utterance.rate = 0.95;
+      utterance.pitch = 1.0;
+
+      utterance.onend = () => {
+        isSpeaking = false;
+        lastSpokenInstruction = text;
+        console.log(`Voz finalizada: "${text}"`);
+        if (onEndCallback && typeof onEndCallback === 'function') {
+          onEndCallback();
         }
-      });
+      };
 
-      // Limpieza al salir
-      window.addEventListener('beforeunload', () => {
-        if (processingInterval) clearInterval(processingInterval);
-        if (video.srcObject) {
-          video.srcObject.getTracks().forEach(track => track.stop());
+      utterance.onerror = (event) => {
+        console.error('Error en síntesis de voz:', event);
+        isSpeaking = false;
+        if (onEndCallback && typeof onEndCallback === 'function') {
+          onEndCallback();
         }
-        if (socket) socket.close();
-        if (recognition) recognition.abort();
-        synth.cancel();
-      });
+      };
 
-      // Inicialización al cargar
-      setTimeout(() => {
-        initVoiceRecognition();
+      synth.speak(utterance);
+    };
 
-        speak(
-          "Bienvenido a Guía Inteligente. Puede presionar el botón para iniciar, o decir: cámara activa, para activar por voz.",
-          false,
-          () => {
-            console.log('✅ Mensaje de bienvenida completado');
+    /**
+     * Inicializa el motor de reconocimiento de voz del navegador.
+     */
+    function initVoiceRecognition() {
+      if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+        console.warn('Reconocimiento de voz no soportado en este navegador.');
+        return;
+      }
+
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognition = new SpeechRecognition();
+      recognition.lang = 'es-ES';
+      recognition.continuous = false; // Solo procesa un comando a la vez
+      recognition.interimResults = false;
+
+      recognition.onstart = () => {
+        isListening = true;
+        micStatus.classList.add('listening');
+        console.log('🎤 Escuchando comando...');
+      };
+
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript.toLowerCase().trim();
+        console.log('Comando escuchado:', transcript);
+
+        if (transcript.includes('cámara') && transcript.includes('activa')) {
+          speak('Comando recibido. Activando cámara.', () => {
+            startCamera();
+          });
+        }
+      };
+
+      recognition.onerror = (event) => {
+        console.error('Error de reconocimiento:', event.error);
+      };
+
+      recognition.onend = () => {
+        isListening = false;
+        micStatus.classList.remove('listening');
+        console.log('Reconocimiento finalizado.');
+      };
+    }
+
+    /**
+     * Activa el micrófono para escuchar un comando de voz.
+     * Se detiene automáticamente después de 7 segundos si no hay resultado.
+     */
+    function startListening() {
+      if (recognition && !isListening && !isCameraOn) {
+        try {
+          recognition.start();
+          // Establece un temporizador para detener la escucha después de 7 segundos
+          setTimeout(() => {
+            if (isListening) {
+              recognition.stop();
+              console.log("Tiempo de escucha agotado.");
+            }
+          }, 7000);
+        } catch (e) {
+          console.error('Error al iniciar el reconocimiento de voz:', e);
+        }
+      }
+    }
+    
+    /**
+     * Conecta al servidor WebSocket e inicializa los manejadores de eventos.
+     */
+    function connectWebSocket() {
+        // ... (resto del código sin cambios)
+      const wsScheme = window.location.protocol === "https:" ? "wss" : "ws";
+      socket = new WebSocket(`${wsScheme}://${window.location.host}/ws/obstacle_detection/`);
+
+      socket.onopen = () => {
+        console.log("✅ WebSocket conectado");
+        connectionStatus.textContent = "CONECTADO";
+        statusMessage.classList.add('hidden');
+        video.classList.add('active');
+        isGuidanceActive = true;
+        
+        speak("Guía inteligente conectada. Iniciando análisis.", () => {
+          requestInstructionCycle(); 
+        });
+      };
+
+      socket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        
+        if (data.from_gemini) {
+          instructionBox.textContent = data.instruction;
+          geminiIndicator.classList.add('active');
+          console.log(`🔮 Instrucción recibida: "${data.instruction}"`);
+          
+          speak(data.instruction, () => {
             setTimeout(() => {
-              startListening();
-            }, 500);
-          }
-        );
-      }, 500);
-    });
-  </script>
+              geminiIndicator.classList.remove('active');
+              console.log("Pausa de 2 segundos finalizada. Solicitando nueva instrucción.");
+              requestInstructionCycle();
+            }, 2000);
+          });
+        }
+      };
 
+      socket.onclose = () => {
+        console.log("❌ WebSocket desconectado. Intentando reconectar...");
+        connectionStatus.textContent = "RECONECTANDO...";
+        isGuidanceActive = false;
+        setTimeout(connectWebSocket, 3000);
+      };
+
+      socket.onerror = (err) => {
+        console.error("❌ Error de WebSocket:", err);
+        connectionStatus.textContent = "ERROR";
+        isGuidanceActive = false;
+        socket.close();
+      };
+    }
+    
+    /**
+     * Captura y envía 3 frames al backend para análisis.
+     */
+    async function requestInstructionCycle() {
+        // ... (resto del código sin cambios)
+      if (!isGuidanceActive || !isCameraOn || !socket || socket.readyState !== WebSocket.OPEN) {
+        console.warn("Ciclo de guía detenido o conexión no lista.");
+        return;
+      }
+      
+      console.log("Iniciando captura de 3 frames...");
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+
+      for (let i = 0; i < 3; i++) {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const imageData = canvas.toDataURL('image/jpeg', 0.7);
+        socket.send(JSON.stringify({'image': imageData}));
+        await new Promise(resolve => setTimeout(resolve, 100)); 
+      }
+      
+      console.log("✅ 3 frames enviados. Esperando instrucción de Gemini...");
+      instructionBox.textContent = "Analizando...";
+    }
+
+    /**
+     * Inicia la cámara y la conexión WebSocket.
+     */
+    async function startCamera() {
+      if (isCameraOn) return;
+      if (recognition && isListening) recognition.stop(); // Detener escucha si está activa
+      
+      statusMessage.textContent = "Iniciando cámara...";
+      statusMessage.classList.remove('hidden');
+      
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { 
+            facingMode: 'environment',
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          }
+        });
+        
+        video.srcObject = stream;
+        await new Promise(resolve => video.onloadedmetadata = resolve);
+        
+        statusMessage.textContent = "Conectando con el servidor...";
+        isCameraOn = true;
+        btnStart.textContent = "Guía Activa ✓";
+        btnStart.disabled = true;
+        
+        connectWebSocket();
+
+      } catch (e) {
+        console.error('❌ Error al acceder a la cámara:', e);
+        statusMessage.textContent = "Error de cámara. Verifique permisos.";
+        speak("No se pudo acceder a la cámara. Verifique los permisos.");
+      }
+    }
+
+    // --- Event Listeners ---
+    btnStart.addEventListener('click', startCamera);
+    
+    btnRepeat.addEventListener('click', () => {
+      if (lastSpokenInstruction) {
+        speak(lastSpokenInstruction);
+      }
+    });
+
+    // --- Limpieza al salir ---
+    window.addEventListener('beforeunload', () => {
+      isGuidanceActive = false;
+      if (video.srcObject) {
+        video.srcObject.getTracks().forEach(track => track.stop());
+      }
+      if (socket) socket.close();
+      if (recognition) recognition.abort();
+      synth.cancel();
+    });
+
+    // --- Flujo de Inicialización ---
+    setTimeout(() => {
+      // 1. Prepara el sistema de reconocimiento de voz
+      initVoiceRecognition();
+
+      // 2. Habla el mensaje de bienvenida
+      speak(
+        "Bienvenido a Guía Inteligente. Puede presionar el botón de inicio o decir 'cámara activa' para comenzar.",
+        // 3. Este callback se ejecuta CUANDO TERMINA de hablar
+        () => {
+          console.log('Mensaje de bienvenida completado. Activando micrófono.');
+          // 4. Activa el micrófono para escuchar el comando
+          startListening();
+        }
+      );
+    }, 500);
+  });
+</script>
 {% endblock %}

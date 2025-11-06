@@ -2,50 +2,69 @@ import base64
 import json
 import threading
 import time
-from collections import Counter
+from uuid import uuid4
 
+import boto3
 import cv2
 import numpy as np
+from botocore.exceptions import BotoCoreError, ClientError
 from channels.generic.websocket import WebsocketConsumer
 from django.conf import settings
 from ultralytics import YOLO
 
 try:
   yolo_model = YOLO('intelligent_assistant/IA_models/yolov8m-seg.pt')
-
   import google.generativeai as genai
 
   genai.configure(api_key=settings.GEMINI_API_KEY)
-  gemini_model = genai.GenerativeModel('gemini-flash-latest')
-  print("Modelos YOLOv8 y Gemini cargados exitosamente.")
+  gemini_model = genai.GenerativeModel('gemini-flash-lite-latest') 
+
+  print("✅ Modelos de IA cargados correctamente:")
+  print("   - YOLOv8m-seg (Detección de objetos)")
+  print("   - Gemini 1.5 Flash (Análisis contextual)")
 
 except Exception as e:
-  print(f"ERROR CRÍTICO: No se pudieron cargar los modelos de IA. {e}")
+  print(f"❌ ERROR CRÍTICO: No se pudieron cargar los modelos de IA. {e}")
   yolo_model = None
   gemini_model = None
 
 
-class ObstacleConsumer(WebsocketConsumer):
+def upload_frame_to_s3(image_bytes: bytes, filename_prefix: str = "frames") -> str:
+  bucket = settings.AWS_STORAGE_BUCKET_NAME
+  region = getattr(settings, "AWS_S3_REGION_NAME", None)
+  filename = f"{filename_prefix}/{uuid4().hex}_{int(time.time())}.jpg"
 
+  s3_client = boto3.client(
+    "s3",
+    aws_access_key_id=getattr(settings, "AWS_ACCESS_KEY_ID", None),
+    aws_secret_access_key=getattr(settings, "AWS_SECRET_ACCESS_KEY", None),
+    region_name=region
+  )
+
+  try:
+    s3_client.put_object(
+      Bucket=bucket,
+      Key=filename,
+      Body=image_bytes,
+      ContentType='image/jpeg',
+    )
+  except (BotoCoreError, ClientError) as e:
+    raise RuntimeError(f"Error subiendo a S3: {e}")
+
+  domain = getattr(settings, "AWS_S3_CUSTOM_DOMAIN", f"{bucket}.s3.amazonaws.com")
+  url = f"https://{domain}/{filename}"
+  return url
+
+
+class ObstacleConsumer(WebsocketConsumer):
   def connect(self):
     self.accept()
-
-    self.last_gemini_call_time = 0
-    self.gemini_call_interval = 7
+    self.frame_batch_buffer = []
     self.is_gemini_processing = False
-
-    self.last_instruction_sent = ""
-    self.last_yolo_instruction = ""
-    self.instruction_repeat_count = 0
-    self.max_repeats_before_silence = 2
-
-    self.yolo_frame_buffer = []
-    self.max_buffer_size = 7
-    
-    self.frame_images_buffer = []  
+    print("Cliente WebSocket conectado.")
 
   def disconnect(self, close_code):
-    pass
+    print("Cliente WebSocket desconectado.")
 
   def receive(self, text_data):
     if not yolo_model or not gemini_model:
@@ -53,7 +72,9 @@ class ObstacleConsumer(WebsocketConsumer):
       return
 
     data = json.loads(text_data)
-    image_data = data['image']
+    image_data = data.get('image')
+    if not image_data:
+      return
 
     try:
       header, encoded = image_data.split(",", 1)
@@ -61,267 +82,155 @@ class ObstacleConsumer(WebsocketConsumer):
       np_arr = np.frombuffer(image_bytes, dtype=np.uint8)
       image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
     except Exception as e:
-      print(f"Error decodificando imagen: {e}")
+      print(f"❌ Error decodificando la imagen: {e}")
       return
 
-    results = yolo_model(image, verbose=False)
-    frame_height, frame_width, _ = image.shape
-    yolo_detections = self.process_yolo_results(results, frame_width, frame_height)
+    self.frame_batch_buffer.append(image_bytes)
 
-    self.yolo_frame_buffer.append(yolo_detections)
-    self.frame_images_buffer.append(image_bytes)
-
-    if len(self.yolo_frame_buffer) > self.max_buffer_size:
-      self.yolo_frame_buffer.pop(0)
-      self.frame_images_buffer.pop(0)
-
-    yolo_instruction = self.generate_yolo_instruction(yolo_detections)
-
-    should_send_instruction = False
-    if yolo_instruction != self.last_yolo_instruction:
-      self.last_yolo_instruction = yolo_instruction
-      self.instruction_repeat_count = 0
-      should_send_instruction = True
-    elif self.instruction_repeat_count < self.max_repeats_before_silence:
-      self.instruction_repeat_count += 1
-      should_send_instruction = True
-
-    response_data = {
-      'zones': yolo_detections["zones"],
-      'silent': not should_send_instruction
-    }
-
-    if should_send_instruction:
-      response_data['instruction'] = yolo_instruction
-
-    self.send(text_data=json.dumps(response_data))
-
-    current_time = time.time()
-    if (not self.is_gemini_processing and
-        len(self.yolo_frame_buffer) >= self.max_buffer_size and
-        len(self.frame_images_buffer) >= self.max_buffer_size and
-        (current_time - self.last_gemini_call_time > self.gemini_call_interval)):
-
+    if len(self.frame_batch_buffer) >= 3 and not self.is_gemini_processing:
       self.is_gemini_processing = True
-      self.last_gemini_call_time = current_time
 
-      accumulated_summary = self.create_accumulated_summary()
+      context_frames_bytes = self.frame_batch_buffer[:2]
+      verification_frame_bytes = self.frame_batch_buffer[2]
 
-      most_recent_frame = self.frame_images_buffer[-1]
+      self.frame_batch_buffer.clear()
 
       threading.Thread(
-        target=self.get_gemini_analysis,
-        args=(most_recent_frame, accumulated_summary)
+        target=self.process_frames_for_gemini,
+        args=(context_frames_bytes, verification_frame_bytes)
       ).start()
 
-  def create_accumulated_summary(self):
-    all_objects = []
-    zone_counters = {"left": 0, "center": 0, "right": 0}
+  def process_frames_for_gemini(self, context_frames_bytes, verification_frame_bytes):
+    yolo_context_data = []
+    for frame_bytes in context_frames_bytes:
+        np_arr = np.frombuffer(frame_bytes, dtype=np.uint8)
+        image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+        
+        results = yolo_model(image, verbose=False)
+        frame_height, frame_width, _ = image.shape
+        yolo_detections = self.process_yolo_results(results, frame_width, frame_height)
+        yolo_context_data.append(yolo_detections)
 
-    for detection in self.yolo_frame_buffer:
-      for obj in detection['objects']:
-        all_objects.append(f"{obj['label']} en {obj['zone']}")
+    yolo_context_text = self.format_yolo_context(yolo_context_data)
+    
+    self.get_gemini_analysis(verification_frame_bytes, yolo_context_text)
 
-      if detection['zones']['left']:
-        zone_counters['left'] += 1
-      if detection['zones']['center']:
-        zone_counters['center'] += 1
-      if detection['zones']['right']:
-        zone_counters['right'] += 1
 
-    object_frequency = Counter(all_objects)
-    most_common = object_frequency.most_common(7)
+  def format_yolo_context(self, yolo_data_list):
+    context_parts = []
+    for i, detections in enumerate(yolo_data_list, 1):
+      if not detections['objects']:
+        context_parts.append(f"Contexto Frame {i}: No se detectaron objetos.")
+      else:
+        objects_by_zone = {'izquierda': [], 'centro': [], 'derecha': []}
+        for obj in detections['objects']:
+          if obj['zone'] in objects_by_zone:
+            objects_by_zone[obj['zone']].append(obj['label'])
+        
+        desc = f"Contexto Frame {i}: "
+        zone_descs = []
+        for zone, labels in objects_by_zone.items():
+          if labels:
+            zone_descs.append(f"en la {zone} hay {', '.join(set(labels))}")
+        
+        if not zone_descs:
+            desc += "sin objetos claros en las zonas."
+        else:
+            desc += "; ".join(zone_descs) + "."
+        context_parts.append(desc)
+    
+    return "\n".join(context_parts)
 
-    summary_parts = []
-
-    if most_common:
-      summary_parts.append("Objetos detectados en los últimos 7 frames:")
-      for obj, count in most_common:
-        if count >= 3:  
-          summary_parts.append(f"  - {obj} (detectado {count} de 7 veces)")
-
-    zone_info = []
-    if zone_counters['center'] >= 4:
-      zone_info.append("CENTRO bloqueado persistentemente")
-    if zone_counters['left'] >= 4:
-      zone_info.append("IZQUIERDA bloqueada")
-    if zone_counters['right'] >= 4:
-      zone_info.append("DERECHA bloqueada")
-
-    if zone_info:
-      summary_parts.append("\nZonas comprometidas en el periodo:")
-      summary_parts.extend([f"  - {z}" for z in zone_info])
-
-    if not summary_parts:
-      return "No se detectaron objetos significativos en los últimos 7 frames"
-
-    return "\n".join(summary_parts)
-
-  def get_gemini_analysis(self, image_bytes, accumulated_summary):
-    print(f"\n{'=' * 60}")
-    print("🔍 ANÁLISIS GEMINI - FRAME ACTUAL DEL USUARIO")
-    print(f"{'=' * 60}")
-    print(f"Contexto histórico (últimos 7 frames):\n{accumulated_summary}")
-    print(f"{'=' * 60}\n")
+  def get_gemini_analysis(self, image_bytes, yolo_context):
+    print(f"\n{'=' * 60}\n🔮 Disparando análisis con Gemini...\nContexto YOLO:\n{yolo_context}\n{'=' * 60}")
 
     try:
-      image_parts = [{"mime_type": "image/jpeg", "data": image_bytes}]
+      s3_url = None
+      try:
+        s3_url = upload_frame_to_s3(image_bytes)
+        print(f"📤 Frame de verificación en S3: {s3_url}")
+      except Exception as e:
+        print(f"⚠️ No se pudo subir frame a S3: {e}")
 
-      prompt = f"""Eres un asistente de navegación en tiempo real para personas no videntes. Tu misión es guiar basándote en lo que el usuario está viendo AHORA.
+      image_part = {"mime_type": "image/jpeg", "data": image_bytes}
+      prompt = f"""
+            Eres un asistente de guía para una persona con discapacidad visual. Tu única función es dar una instrucción de navegación corta, clara y directa.
 
-CONTEXTO HISTÓRICO (últimos 1-2 segundos):
-{accumulated_summary}
+            **Información Recibida:**
+            1.  **Contexto de YOLO:** Objetos detectados en 2 frames anteriores. Úsalo para entender la escena que conduce a este momento.
+            2.  **Fotograma Actual:** La imagen que el usuario ve ahora mismo. Tu instrucción DEBE basarse en esta imagen, usando el contexto solo como referencia.
 
-⚠️ IMPORTANTE: El contexto histórico es solo referencia. Tu instrucción debe basarse en la imagen ACTUAL que el usuario está viendo en este momento.
+            **Contexto YOLO (Frames Anteriores):**
+            {yolo_context}
 
-ANÁLISIS VISUAL REQUERIDO:
-Analiza la imagen ACTUAL desde una perspectiva frontal a altura del pecho.
+            **REGLAS OBLIGATORIAS:**
+            1.  **Formato Estricto:** Tu respuesta DEBE ser `Instrucción, [contexto breve]`. Sin excepciones.
+            2.  **Brevedad:** La respuesta completa no debe superar las 10 palabras.
+            3.  **Directo al Punto:** No saludes, no expliques, no uses frases como "Basado en el análisis". Responde ÚNICAMENTE con la instrucción.
+            4.  **Prioriza la Seguridad:** La instrucción debe advertir sobre el peligro más inmediato y relevante en el **Fotograma Actual**.
 
-INSTRUCCIONES DE NAVEGACIÓN:
-1. **Prioriza la seguridad inmediata**: Analiza lo que hay AHORA frente al usuario.
+            **Ejemplos de Respuestas CORRECTAS:**
+            *   Gire a la derecha, pared al frente.
+            *   Gire a la izquierda, silla en centro.
+            *   Cuidado con el altillo.
+            *   Cuidado con las escaleras, suba con cuidado.
+            *   Cuidado con la persona del centro.
+            *   Cuidado puerta cerrada al frente, la manija está del lado izquierdo.
+            *   Avance con cuidado, desnivel en el suelo.
+            *   Alerta, posible hueco a la derecha.
 
-2. **Distingue entre pasado y presente**:
-   - ❌ NO menciones objetos del contexto histórico si no están en la imagen actual
-   - ✅ Si un objeto del historial YA NO está presente, el usuario ya lo superó
-   - ✅ Enfócate en obstáculos NUEVOS o ACTUALES en la imagen
+            **Situaciones de URGENCIA (Máxima Prioridad):**
+            - **Obstáculo Total (pared, puerta, objeto grande):** Si el **Fotograma Actual** muestra un bloqueo total, indica una vía de escape. Ejemplo: "Gire a la derecha, pared al frente".
+            - **Peligros Graves (escaleras, huecos, desniveles, ascensores):** Tu instrucción debe centrarse en ese peligro específico. Ejemplo: "Cuidado con las escaleras, suba con cuidado".
 
-3. **Estructura de respuesta**:
-   - ACCIÓN primero: "Detente", "Gira a la derecha", "Gira a la izquierda", "Avanza"
-   - Razón ACTUAL: describe solo lo que ves EN LA IMAGEN AHORA
-   
-4. **Casos específicos**:
-   - Si la imagen muestra camino libre pero el historial tenía obstáculos → "Camino despejado, avanza"
-   - Si la imagen muestra un obstáculo nuevo → Instrúyelo sobre el obstáculo ACTUAL
-   - Si la imagen muestra una pared/barrera → "Pared al frente, gira [dirección]"
+            Analiza el **Fotograma Actual** para confirmar el peligro real y da la instrucción más segura para este preciso momento.
 
-5. **Camino despejado**: Di "Camino despejado, avanza" si la imagen ACTUAL no muestra riesgos.
-
-6. **Precisión espacial**:
-   - Usa "izquierda/derecha/centro/adelante" según la imagen ACTUAL
-   - Indica distancia aproximada si es crítico
-
-EJEMPLOS CORRECTOS:
-✅ Historial: "Mesa centro (7/7)" | Imagen actual: pared clara
-   → "Camino despejado, avanza"
-
-✅ Historial: "Despejado" | Imagen actual: persona cruzando
-   → "Detente. Persona cruzando adelante"
-
-✅ Historial: "Silla izquierda (5/7)" | Imagen actual: pasillo vacío
-   → "Camino despejado, continúa"
-
-✅ Historial: "Despejado" | Imagen actual: escalera
-   → "Alto. Escalera descendiendo al frente"
-
-❌ INCORRECTO:
-   Historial: "Mesa centro (7/7)" | Imagen actual: pasillo vacío
-   → "Desvíate de la mesa" ← ¡NO! El usuario ya pasó la mesa
-
-FORMATO DE RESPUESTA:
-- Máximo 2 oraciones
-- Sin markdown, sin asteriscos
-- Basado en la imagen ACTUAL
-- Tono directo y accionable
-
-Responde SOLO con la instrucción basada en lo que ves EN LA IMAGEN ACTUAL:"""
+            **INSTRUCCIÓN:**
+            """
 
       response = gemini_model.generate_content(
-        [prompt, image_parts[0]],
-        request_options={"timeout": 20}
+        [prompt, image_part],
+        request_options={"timeout": 15} 
       )
 
       if response and response.text:
-        gemini_instruction = response.text.strip()
-        gemini_instruction = gemini_instruction.replace('**', '').replace('*', '')
+        gemini_instruction = response.text.strip().replace('*', '').replace('\n', ' ')
+        print(f"✅ Instrucción de Gemini: '{gemini_instruction}'")
 
-        print(f"✅ INSTRUCCIÓN GEMINI (sobre imagen ACTUAL): '{gemini_instruction}'\n")
-
-        self.last_yolo_instruction = gemini_instruction
-        self.instruction_repeat_count = 0
-
-        self.send(text_data=json.dumps({
+        payload = {
           'instruction': gemini_instruction,
-          'zones': self.yolo_frame_buffer[-1]["zones"],
-          'from_gemini': True
-        }))
+          'from_gemini': True, 
+        }
+        if s3_url:
+          payload['frame_s3_url'] = s3_url
+
+        self.send(text_data=json.dumps(payload))
       else:
-        print("⚠️ Gemini no devolvió texto válido.")
+        print("⚠️ Gemini no devolvió una respuesta válida.")
+        self.send_error_message("Análisis no disponible.")
 
     except Exception as e:
-      print(f"❌ Error en Gemini API: {e}")
+      print(f"❌ Error en la llamada a Gemini: {e}")
+      self.send_error_message("Error en el análisis. Reintentando.")
     finally:
       self.is_gemini_processing = False
 
-      self.yolo_frame_buffer.clear()
-      self.frame_images_buffer.clear()
-
   def process_yolo_results(self, results, frame_width, frame_height):
     zone_width = frame_width / 3
-    detections = {
-      "objects": [],
-      "zones": {"left": False, "center": False, "right": False},
-      "confidence_avg": 0.0,
-      "total_detections": 0
-    }
-
-    confidences = []
-
+    detections = {"objects": []}
     for r in results:
       for box in r.boxes:
-        x1, y1, x2, y2 = box.xyxy[0]
+        x1, _, x2, _ = box.xyxy[0]
         cls_id = int(box.cls[0])
-        confidence = float(box.conf[0])
         label = yolo_model.names[cls_id]
-
-        confidences.append(confidence)
-
         cx = (x1 + x2) / 2
-        cy = (y1 + y2) / 2
-
-        obj_area = (x2 - x1) * (y2 - y1)
-        frame_area = frame_width * frame_height
-        area_percentage = (obj_area / frame_area) * 100
-
-        zone = ""
+        zone = "centro"
         if cx < zone_width:
-          detections["zones"]["left"] = True
           zone = "izquierda"
         elif cx > 2 * zone_width:
-          detections["zones"]["right"] = True
           zone = "derecha"
-        else:
-          detections["zones"]["center"] = True
-          zone = "centro"
-
-        detections["objects"].append({
-          "label": label,
-          "zone": zone,
-          "confidence": round(confidence, 2),
-          "area_pct": round(area_percentage, 1),
-          "position": "alto" if cy < frame_height / 3 else "medio" if cy < 2 * frame_height / 3 else "bajo"
-        })
-
-    detections["total_detections"] = len(confidences)
-    if confidences:
-      detections["confidence_avg"] = round(sum(confidences) / len(confidences), 2)
-
+        detections["objects"].append({"label": label, "zone": zone})
     return detections
 
-  def generate_yolo_instruction(self, detections):
-    if detections["zones"]["center"]:
-      center_objects = [obj for obj in detections['objects'] if obj['zone'] == 'centro']
-      if center_objects and any(obj['area_pct'] > 15 for obj in center_objects):
-        return "Obstáculo grande al frente, precaución."
-      return "Obstáculo al frente."
-
-    if not detections["zones"]["center"] and (detections["zones"]["left"] or detections["zones"]["right"]):
-      return "Centro libre, avanza."
-
-    return "Despejado."
-
   def send_error_message(self, message):
-    self.send(text_data=json.dumps({
-      'instruction': message,
-      'zones': {"left": False, "center": False, "right": False},
-      'error': True
-    }))
+    self.send(text_data=json.dumps({'instruction': message, 'error': True, 'from_gemini': True}))
