@@ -102,13 +102,22 @@ class ObstacleConsumer(WebsocketConsumer):
 
   def process_frames_for_gemini(self, context_frames_bytes, verification_frame_bytes):
     yolo_context_data = []
-    for frame_bytes in context_frames_bytes:
+    for idx, frame_bytes in enumerate(context_frames_bytes, 1):
         np_arr = np.frombuffer(frame_bytes, dtype=np.uint8)
         image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
         
-        results = yolo_model(image, verbose=False)
+        results = yolo_model(image, conf=0.15, verbose=False)  # Antes era ~0.25 por defecto
+        
         frame_height, frame_width, _ = image.shape
         yolo_detections = self.process_yolo_results(results, frame_width, frame_height)
+        
+        print(f"🔍 Frame {idx} - Detecciones YOLO: {len(yolo_detections['objects'])} objetos")
+        if yolo_detections['objects']:
+            for obj in yolo_detections['objects']:
+                print(f"   ➤ {obj['label']} ({obj['confidence']:.2f}) en {obj['zone']}")
+        else:
+            print(f"   ⚠️ No se detectaron objetos en Frame {idx}")
+        
         yolo_context_data.append(yolo_detections)
 
     yolo_context_text = self.format_yolo_context(yolo_context_data)
@@ -125,13 +134,13 @@ class ObstacleConsumer(WebsocketConsumer):
         objects_by_zone = {'izquierda': [], 'centro': [], 'derecha': []}
         for obj in detections['objects']:
           if obj['zone'] in objects_by_zone:
-            objects_by_zone[obj['zone']].append(obj['label'])
+            objects_by_zone[obj['zone']].append(f"{obj['label']} ({obj['confidence']:.0%})")
         
         desc = f"Contexto Frame {i}: "
         zone_descs = []
         for zone, labels in objects_by_zone.items():
           if labels:
-            zone_descs.append(f"en la {zone} hay {', '.join(set(labels))}")
+            zone_descs.append(f"en la {zone} hay {', '.join(labels)}")
         
         if not zone_descs:
             desc += "sin objetos claros en las zonas."
@@ -218,18 +227,32 @@ class ObstacleConsumer(WebsocketConsumer):
   def process_yolo_results(self, results, frame_width, frame_height):
     zone_width = frame_width / 3
     detections = {"objects": []}
+    
     for r in results:
+      
+      if len(r.boxes) == 0:
+        print("   ⚠️ YOLO no detectó ninguna caja (boxes vacío)")
+        continue
+        
       for box in r.boxes:
         x1, _, x2, _ = box.xyxy[0]
         cls_id = int(box.cls[0])
+        confidence = float(box.conf[0]) 
         label = yolo_model.names[cls_id]
+        
         cx = (x1 + x2) / 2
         zone = "centro"
         if cx < zone_width:
           zone = "izquierda"
         elif cx > 2 * zone_width:
           zone = "derecha"
-        detections["objects"].append({"label": label, "zone": zone})
+        
+        detections["objects"].append({
+          "label": label, 
+          "zone": zone,
+          "confidence": confidence 
+        })
+    
     return detections
 
   def send_error_message(self, message):
