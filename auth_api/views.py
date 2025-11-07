@@ -1,13 +1,13 @@
 import traceback
 
 from django.contrib import messages
-from django.shortcuts import redirect
-from django.views.decorators.cache import never_cache
-from django.utils.decorators import method_decorator
 from django.contrib.auth.views import LoginView, LogoutView
 from django.core.exceptions import ValidationError
 from django.http import JsonResponse
+from django.shortcuts import redirect
 from django.urls import reverse_lazy
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import never_cache
 from django.views.generic import CreateView
 
 from auth_api.forms import CustomUserCreationForm
@@ -163,6 +163,14 @@ class RegisterView(SafeExceptionMixin, CreateView):
         return JsonResponse({field_name: "invalid", "error": str(e)})
 
     return super().post(request, *args, **kwargs)
+
+  def dispatch(self, request, *args, **kwargs):
+    if request.user.is_authenticated:
+      return redirect(self.get_success_url())
+    return super().dispatch(request, *args, **kwargs)
+
+  def get_success_url(self):
+    return reverse_lazy("auth_api:core:home")
 
 
 @method_decorator(never_cache, name='dispatch')
